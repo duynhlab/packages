@@ -1,8 +1,0 @@
-[Unit]
-Description=Micro Platform All Services
-After=micro-platform-infra.target
-Wants=micro-platform-api-server.service micro-platform-user-api.service micro-platform-checkout-api.service micro-platform-voter-api.service
-
-[Install]
-WantedBy=multi-user.target
-

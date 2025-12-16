@@ -1,0 +1,37 @@
+[Unit]
+Description=Platform - Voter API
+After=platform-infra.target
+Requires=platform-infra.target
+PartOf=platform-all.target
+
+[Service]
+Type=exec
+User=nobody
+Group=nobody
+WorkingDirectory=/opt/platform/apps/voter-api
+
+# Load shared configurations first
+EnvironmentFile=/opt/platform/apps/conf/env.properties
+EnvironmentFile=/opt/platform/apps/conf/redis.properties
+
+# Load app-specific configuration (can override shared)
+EnvironmentFile=/opt/platform/apps/voter-api/voter-api.properties
+
+# Optional override file (won't fail if missing)
+EnvironmentFile=-/opt/platform/apps/voter-api/voter-api.override
+
+ExecStart=/opt/platform/apps/voter-api/voter-api
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/platform/voter-api/stdout.log
+StandardError=append:/var/log/platform/voter-api/stderr.log
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/log/platform/voter-api
+
+[Install]
+WantedBy=multi-user.target
+
