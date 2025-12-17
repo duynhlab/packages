@@ -8,12 +8,12 @@
 #   2. Copy binary vào apps/api-server/ (staging)
 #   3. Copy TẤT CẢ files vào rpm/SOURCES/ (RPM input)
 #   4. Build RPM trong Docker container
-#   5. Output: dist/micro-platform-*.rpm
+#   5. Output: dist/platform-*.rpm
 # ============================================================================
 
 set -e
 
-echo "🚀 Building Micro Platform..."
+echo "🚀 Building Platform..."
 
 # ============================================================================
 # STEP 1: Build Binaries từ Source Code cho TẤT CẢ Services có sẵn trong repo/
@@ -73,7 +73,7 @@ done
 # STEP 3: Prepare RPM SOURCES - Copy TẤT CẢ files cần thiết
 # ============================================================================
 # RPM cần tất cả files trong rpm/SOURCES/ để build
-# Files này sẽ được đọc bởi rpm/specs/micro-platform.spec
+# Files này sẽ được đọc bởi rpm/specs/platform.spec
 # ============================================================================
 echo "📦 Preparing RPM sources..."
 # Clean previous build artifacts
@@ -88,9 +88,9 @@ for service in "${services[@]}"; do
     fi
 done
 
-# 3.2: Shared configs (từ apps/conf-shared/)
+# 3.2: Shared configs (từ apps/conf/)
 mkdir -p rpm/SOURCES/conf
-cp apps/conf-shared/*.properties rpm/SOURCES/conf/
+cp apps/conf/*.properties rpm/SOURCES/conf/
 # Fix permissions: remove executable bit from .properties files
 chmod 644 rpm/SOURCES/conf/*.properties
 
@@ -105,18 +105,23 @@ for service in "${services[@]}"; do
 done
 
 # 3.4: Infrastructure configs (từ infra/)
-cp infra/nginx/micro-platform.conf rpm/SOURCES/
-cp infra/redis/micro-platform-redis.conf rpm/SOURCES/
+cp infra/nginx/platform.conf rpm/SOURCES/
+cp infra/redis/platform-redis.conf rpm/SOURCES/
 
 # 3.5: Systemd service files (từ rpm/files/systemd/)
 cp rpm/files/systemd/* rpm/SOURCES/
+
+# 3.6: Initialization scripts (từ rpm/platform/lib/)
+if [ -d "rpm/platform/lib" ]; then
+    cp rpm/platform/lib/*.sh rpm/SOURCES/ 2>/dev/null || true
+fi
 
 # ============================================================================
 # STEP 4: Build RPM trong Docker Container
 # ============================================================================
 # Input:  rpm/SOURCES/ (tất cả files)
-#         rpm/specs/micro-platform.spec (RPM specification)
-# Output: dist/micro-platform-*.rpm (RPM package)
+#         rpm/specs/platform.spec (RPM specification)
+# Output: dist/platform-*.rpm (RPM package)
 # ============================================================================
 echo "📦 Building single RPM..."
 docker run --rm \
@@ -133,17 +138,17 @@ docker run --rm \
             --define "_srcrpmdir /workspace/SRPMS" \
             --define "_rpmdir /workspace/RPMS" \
             --define "_buildrootdir /workspace/BUILDROOT" \
-            specs/micro-platform.spec
+            specs/platform.spec
         
         # Copy RPM to dist
         find RPMS -name "*.rpm" -exec cp {} /workspace/dist/ \;
     '
 
 echo "✅ Single RPM built:"
-ls -la dist/micro-platform-*.rpm
+ls -la dist/platform-*.rpm
 
 echo ""
-echo "🎉 Micro Platform RPM created!"
-echo "📦 Install: rpm -ivh dist/micro-platform-*.rpm"
+echo "🎉 Platform RPM created!"
+echo "📦 Install: rpm -ivh dist/platform-*.rpm"
 echo "🌐 Access: http://localhost:80/"
-echo "🔧 Control: systemctl start/stop micro-platform-all.target"
+echo "🔧 Control: systemctl start/stop platform-all.target"
