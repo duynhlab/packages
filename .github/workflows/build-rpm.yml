@@ -24,53 +24,43 @@ on:
         type: string
 
 jobs:
-  # Build binaries - runs on both PRs and push/tags/manual
-  build-binaries:
-    name: Build Binaries
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-          cache: false
-
-      - name: Build binaries
-        run: |
-          echo "Building binaries..."
-          for dir in repo/*/; do
-              if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
-                  service=$(basename "$dir")
-                  echo "Building $service..."
-                  cd "$dir"
-                  go mod tidy
-                  go build -o "$service" main.go
-                  if [ $? -ne 0 ]; then
-                      echo "Failed to build $service"
-                      exit 1
-                  fi
-                  echo "$service built successfully"
-                  cd ../..
-              fi
-          done
-          echo "All services built successfully"
-
-  # Build RPM package - runs on push, tags, and manual dispatch (not on PRs)
-  build-rpm:
-    if: github.event_name != 'pull_request'
-    needs: build-binaries
-    runs-on: ubuntu-latest
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: false
+
+    - name: Build binaries
+      run: |
+        echo "Building binaries..."
+        for dir in repo/*/; do
+            if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
+                service=$(basename "$dir")
+                echo "Building $service..."
+                cd "$dir"
+                go mod tidy
+                go build -o "$service" main.go
+                if [ $? -ne 0 ]; then
+                    echo "Failed to build $service"
+                    exit 1
+                fi
+                echo "$service built successfully"
+                cd ../..
+            fi
+        done
+        echo "All services built successfully"
+
     # Version determination with priority: Manual input > Git tag > Default
     - name: Determine version
       id: version
+      if: github.event_name != 'pull_request'
       run: |
         # Priority 1: Manual input (workflow_dispatch)
         if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
@@ -94,6 +84,7 @@ jobs:
 
     # Update spec file with determined version
     - name: Update spec file with version
+      if: github.event_name != 'pull_request'
       run: |
         VERSION="${{ steps.version.outputs.version }}"
         RELEASE="${{ steps.version.outputs.release }}"
@@ -113,6 +104,7 @@ jobs:
         grep "^Release:" rpm/specs/platform.spec
 
     - name: Prepare RPM sources
+      if: github.event_name != 'pull_request'
       run: |
         echo "Preparing sources..."
         rm -rf rpm/SOURCES
@@ -146,6 +138,7 @@ jobs:
         find rpm/SOURCES -type f
 
     - name: Build RPM
+      if: github.event_name != 'pull_request'
       run: |
         echo "Building RPM..."
         mkdir -p dist
@@ -169,16 +162,8 @@ jobs:
           '
         ls -la dist/*.rpm
 
-    # Restore spec file to original state (optional cleanup)
-    - name: Restore spec file
-      if: always()
-      run: |
-        if [ -f rpm/specs/platform.spec.backup ]; then
-          mv rpm/specs/platform.spec.backup rpm/specs/platform.spec
-          echo "Spec file restored"
-        fi
-
     - name: Upload artifacts
+      if: github.event_name != 'pull_request'
       uses: actions/upload-artifact@v4
       with:
         name: rpm-packages
