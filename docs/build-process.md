@@ -31,7 +31,7 @@ repo/
 ### 2. Configuration Files (apps/)
 ```
 apps/
-├── conf-shared/         # Shared configs (AVAILABLE)
+├── conf/                # Shared configs (AVAILABLE)
 │   ├── env.properties
 │   └── redis.properties
 ├── user-api/
@@ -47,27 +47,27 @@ apps/
 ```
 infra/
 ├── nginx/
-│   └── micro-platform.conf     # AVAILABLE
+│   └── platform.conf     # AVAILABLE
 └── redis/
-    └── micro-platform-redis.conf # AVAILABLE
+    └── platform-redis.conf # AVAILABLE
 ```
 **Action**: These files are already available
 
 ### 4. Systemd Files (rpm/files/systemd/)
 ```
 rpm/files/systemd/
-├── micro-platform-user-api.service      # AVAILABLE
-├── micro-platform-checkout-api.service  # AVAILABLE
-├── micro-platform-voter-api.service     # AVAILABLE
-├── micro-platform-infra.target           # AVAILABLE
-└── micro-platform-all.target            # AVAILABLE
+├── platform-user-api.service      # AVAILABLE
+├── platform-checkout-api.service  # AVAILABLE
+├── platform-voter-api.service     # AVAILABLE
+├── platform-infra.target           # AVAILABLE
+└── platform-all.target            # AVAILABLE
 ```
 **Action**: These files are already available
 
 ### 5. RPM Spec (rpm/specs/)
 ```
 rpm/specs/
-└── micro-platform.spec   # AVAILABLE
+└── platform.spec   # AVAILABLE
 ```
 **Action**: This file is already available
 
@@ -107,17 +107,18 @@ rpm/SOURCES/
 │   ├── voter-api                # Binary (from apps/voter-api/)
 │   └── voter-api.properties     # Config (from apps/voter-api/)
 ├── conf/                         # Shared configs
-│   ├── env.properties        # (from apps/conf-shared/)
-│   └── redis.properties      # (from apps/conf-shared/)
-├── micro-platform.conf           # (from infra/nginx/)
-├── micro-platform-redis.conf     # (from infra/redis/)
-├── micro-platform-*.service      # (from rpm/files/systemd/)
-└── micro-platform-*.target       # (from rpm/files/systemd/)
+│   ├── env.properties        # (from apps/conf/)
+│   └── redis.properties      # (from apps/conf/)
+├── platform.conf           # (from infra/nginx/)
+├── platform-redis.conf     # (from infra/redis/)
+├── platform-*.service      # (from rpm/files/systemd/)
+├── platform-*.target       # (from rpm/files/systemd/)
+└── print-version.sh        # (from rpm/platform/lib/)
 ```
 
 ### Step 4: Build RPM in Docker
 ```
-rpm/SOURCES/  →  [rpmbuild]  →  dist/micro-platform-1.0.0-1.x86_64.rpm
+rpm/SOURCES/  →  [rpmbuild]  →  dist/platform-1.0.0-1.x86_64.rpm
 ```
 
 ---
@@ -126,7 +127,7 @@ rpm/SOURCES/  →  [rpmbuild]  →  dist/micro-platform-1.0.0-1.x86_64.rpm
 
 ```
 dist/
-└── micro-platform-1.0.0-1.x86_64.rpm  # ✅ Final RPM package
+└── platform-1.0.0-1.x86_64.rpm  # ✅ Final RPM package
 ```
 
 ---
@@ -149,7 +150,7 @@ dist/
 2. Copy binaries → `apps/{service}/`
 3. Copy everything (binaries + configs) to `rpm/SOURCES/`
 4. Build RPM in Docker
-5. Output: `dist/micro-platform-*.rpm`
+5. Output: `dist/platform-*.rpm`
 
 **Result:**
 - 1 RPM file containing everything (service binaries, configs, systemd files)
@@ -158,3 +159,4 @@ dist/
 
 ## Ref
 - https://www.redhat.com/en/blog/create-rpm-package
+
