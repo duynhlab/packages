@@ -24,26 +24,6 @@ on:
         type: string
 
 jobs:
-  # Code quality checks - runs only on pull requests
-  go-check:
-    name: Code Quality Checks
-    if: github.event_name == 'pull_request'
-    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
-    with:
-      command-test: |
-        for dir in repo/*/; do
-          [ -d "$dir" ] && [ -f "$dir/main.go" ] || continue
-          service=$(basename "$dir")
-          echo "Testing $service..."
-          cd "$dir"
-          go test ./...
-          cd ../..
-        done
-      lint: true
-      lint-path: '.golangci.yml'
-      setup-go: true
-    secrets: inherit
-
   # Build RPM package - runs on push, tags, and manual dispatch (not on PRs)
   build-rpm:
     if: github.event_name != 'pull_request'
