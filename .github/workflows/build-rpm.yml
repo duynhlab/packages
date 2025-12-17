@@ -24,9 +24,44 @@ on:
         type: string
 
 jobs:
+  # Build binaries - runs on both PRs and push/tags/manual
+  build-binaries:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+
+      - name: Build binaries
+        run: |
+          echo "Building binaries..."
+          for dir in repo/*/; do
+              if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
+                  service=$(basename "$dir")
+                  echo "Building $service..."
+                  cd "$dir"
+                  go mod tidy
+                  go build -o "$service" main.go
+                  if [ $? -ne 0 ]; then
+                      echo "Failed to build $service"
+                      exit 1
+                  fi
+                  echo "$service built successfully"
+                  cd ../..
+              fi
+          done
+          echo "All services built successfully"
+
   # Build RPM package - runs on push, tags, and manual dispatch (not on PRs)
   build-rpm:
     if: github.event_name != 'pull_request'
+    needs: build-binaries
     runs-on: ubuntu-latest
     
     steps:
@@ -77,29 +112,9 @@ jobs:
         grep "^Version:" rpm/specs/platform.spec
         grep "^Release:" rpm/specs/platform.spec
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.25'
-        cache: false
-
-    - name: Build binaries
-      run: |
-        echo "🚀 Building binaries..."
-        for dir in repo/*/; do
-            if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
-                service=$(basename "$dir")
-                echo "🔨 $service..."
-                cd "$dir"
-                go mod tidy
-                go build -o "$service" main.go
-                cd ../..
-            fi
-        done
-
     - name: Prepare RPM sources
       run: |
-        echo "📦 Preparing sources..."
+        echo "Preparing sources..."
         rm -rf rpm/SOURCES
         mkdir -p rpm/SOURCES
         
@@ -132,7 +147,7 @@ jobs:
 
     - name: Build RPM
       run: |
-        echo "📦 Building RPM..."
+        echo "Building RPM..."
         mkdir -p dist
         docker run --rm \
           -v "${{ github.workspace }}/rpm/SOURCES:/workspace/SOURCES" \
@@ -160,7 +175,7 @@ jobs:
       run: |
         if [ -f rpm/specs/platform.spec.backup ]; then
           mv rpm/specs/platform.spec.backup rpm/specs/platform.spec
-          echo "Spec file restored to original state"
+          echo "Spec file restored"
         fi
 
     - name: Upload artifacts
