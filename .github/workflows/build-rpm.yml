@@ -24,7 +24,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version: '1.25'
         cache: false
 
     - name: Build binaries
@@ -61,14 +61,14 @@ jobs:
         
         # Copy configs and systemd files
         mkdir -p rpm/SOURCES/conf
-        cp apps/conf-shared/*.properties rpm/SOURCES/conf/
+        cp apps/conf/*.properties rpm/SOURCES/conf/
         for dir in apps/*/; do
             [ -d "$dir" ] || continue
             service=$(basename "$dir")
             [ -f "apps/$service/$service.properties" ] && cp "apps/$service/$service.properties" "rpm/SOURCES/$service/" || true
         done
-        cp infra/nginx/micro-platform.conf rpm/SOURCES/
-        cp infra/redis/micro-platform-redis.conf rpm/SOURCES/
+        cp infra/nginx/platform.conf rpm/SOURCES/
+        cp infra/redis/platform-redis.conf rpm/SOURCES/
         cp rpm/files/systemd/* rpm/SOURCES/
         
         # Verify
@@ -93,7 +93,7 @@ jobs:
               --define "_srcrpmdir /workspace/SRPMS" \
               --define "_rpmdir /workspace/RPMS" \
               --define "_buildrootdir /workspace/BUILDROOT" \
-              /workspace/specs/micro-platform.spec
+              /workspace/specs/platform.spec
             find /workspace/RPMS -name "*.rpm" -exec cp {} /workspace/dist/ \;
           '
         ls -la dist/*.rpm
