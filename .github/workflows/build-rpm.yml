@@ -28,7 +28,7 @@ jobs:
   go-check:
     name: Code Quality Checks
     if: github.event_name == 'pull_request'
-    uses: duyhenryer/workflows/.github/workflows/go-check.yml@main
+    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
     with:
       command-test: |
         for dir in repo/*/; do
