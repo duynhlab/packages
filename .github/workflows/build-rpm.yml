@@ -12,38 +12,109 @@ on:
       - main
       - master
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'RPM version (e.g., 1.2.3)'
+        required: false
+        type: string
+      release:
+        description: 'RPM release number'
+        required: false
+        default: '1'
+        type: string
 
 jobs:
+  # Build binaries - runs on both PRs and push/tags/manual
+  build-binaries:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+
+      - name: Build binaries
+        run: |
+          echo "Building binaries..."
+          for dir in repo/*/; do
+              if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
+                  service=$(basename "$dir")
+                  echo "Building $service..."
+                  cd "$dir"
+                  go mod tidy
+                  go build -o "$service" main.go
+                  if [ $? -ne 0 ]; then
+                      echo "Failed to build $service"
+                      exit 1
+                  fi
+                  echo "$service built successfully"
+                  cd ../..
+              fi
+          done
+          echo "All services built successfully"
+
+  # Build RPM package - runs on push, tags, and manual dispatch (not on PRs)
   build-rpm:
+    if: github.event_name != 'pull_request'
+    needs: build-binaries
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.21'
-        cache: false
-
-    - name: Build binaries
+    # Version determination with priority: Manual input > Git tag > Default
+    - name: Determine version
+      id: version
       run: |
-        echo "🚀 Building binaries..."
-        for dir in repo/*/; do
-            if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
-                service=$(basename "$dir")
-                echo "🔨 $service..."
-                cd "$dir"
-                go mod tidy
-                go build -o "$service" main.go
-                cd ../..
-            fi
-        done
+        # Priority 1: Manual input (workflow_dispatch)
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+          echo "Using manual input version: ${{ inputs.version }}"
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "release=${{ inputs.release || '1' }}" >> $GITHUB_OUTPUT
+        
+        # Priority 2: Git tag (tag push)
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Using tag version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release=1" >> $GITHUB_OUTPUT
+        
+        # Priority 3: Default
+        else
+          echo "Using default version: 1.0.0"
+          echo "version=1.0.0" >> $GITHUB_OUTPUT
+          echo "release=1" >> $GITHUB_OUTPUT
+        fi
+
+    # Update spec file with determined version
+    - name: Update spec file with version
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        RELEASE="${{ steps.version.outputs.release }}"
+        
+        # Backup original spec file
+        cp rpm/specs/platform.spec rpm/specs/platform.spec.backup
+        
+        # Replace version
+        sed -i "s/^Version:.*/Version:        $VERSION/" rpm/specs/platform.spec
+        
+        # Replace release
+        sed -i "s/^Release:.*/Release:        $RELEASE/" rpm/specs/platform.spec
+        
+        # Verify changes
+        echo "Updated spec file:"
+        grep "^Version:" rpm/specs/platform.spec
+        grep "^Release:" rpm/specs/platform.spec
 
     - name: Prepare RPM sources
       run: |
-        echo "📦 Preparing sources..."
+        echo "Preparing sources..."
         rm -rf rpm/SOURCES
         mkdir -p rpm/SOURCES
         
@@ -61,14 +132,14 @@ jobs:
         
         # Copy configs and systemd files
         mkdir -p rpm/SOURCES/conf
-        cp apps/conf-shared/*.properties rpm/SOURCES/conf/
+        cp apps/conf/*.properties rpm/SOURCES/conf/
         for dir in apps/*/; do
             [ -d "$dir" ] || continue
             service=$(basename "$dir")
             [ -f "apps/$service/$service.properties" ] && cp "apps/$service/$service.properties" "rpm/SOURCES/$service/" || true
         done
-        cp infra/nginx/micro-platform.conf rpm/SOURCES/
-        cp infra/redis/micro-platform-redis.conf rpm/SOURCES/
+        cp infra/nginx/platform.conf rpm/SOURCES/
+        cp infra/redis/platform-redis.conf rpm/SOURCES/
         cp rpm/files/systemd/* rpm/SOURCES/
         
         # Verify
@@ -76,7 +147,7 @@ jobs:
 
     - name: Build RPM
       run: |
-        echo "📦 Building RPM..."
+        echo "Building RPM..."
         mkdir -p dist
         docker run --rm \
           -v "${{ github.workspace }}/rpm/SOURCES:/workspace/SOURCES" \
@@ -93,10 +164,19 @@ jobs:
               --define "_srcrpmdir /workspace/SRPMS" \
               --define "_rpmdir /workspace/RPMS" \
               --define "_buildrootdir /workspace/BUILDROOT" \
-              /workspace/specs/micro-platform.spec
+              /workspace/specs/platform.spec
             find /workspace/RPMS -name "*.rpm" -exec cp {} /workspace/dist/ \;
           '
         ls -la dist/*.rpm
+
+    # Restore spec file to original state (optional cleanup)
+    - name: Restore spec file
+      if: always()
+      run: |
+        if [ -f rpm/specs/platform.spec.backup ]; then
+          mv rpm/specs/platform.spec.backup rpm/specs/platform.spec
+          echo "Spec file restored"
+        fi
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

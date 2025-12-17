@@ -38,7 +38,7 @@ The build script (`scripts/build.sh`) will:
    - `repo/voter-api/` → `repo/voter-api/voter-api` (binary)
 3. **Copy binaries** to `apps/{service}/` (staging area)
 4. **Copy everything** (binaries + configs) to `rpm/SOURCES/` (RPM input)
-5. **Build RPM** in Docker container → `dist/micro-platform-*.rpm`
+5. **Build RPM** in Docker container → `dist/platform-*.rpm`
 
 **Note**: The RPM spec only handles `user-api`, `checkout-api`, and `voter-api` (simple and explicit)
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=Platform Infrastructure
+After=network.target nginx.service redis.service
+Requires=nginx.service redis.service
+PartOf=platform-all.target
+
+[Install]
+WantedBy=multi-user.target
+

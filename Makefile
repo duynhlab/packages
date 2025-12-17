@@ -1,10 +1,10 @@
-# Micro Platform - Single RPM Builder
+# Platform - Single RPM Builder
 
 .PHONY: help docker-build build clean
 
 # Default target
 help:
-	@echo "Micro Platform - Available targets:"
+	@echo "Platform - Available targets:"
 	@echo ""
 	@echo "  docker-build  - Build Docker image"
 	@echo "  build         - Build single RPM with all services"
@@ -21,7 +21,7 @@ docker-build:
 
 # Build single RPM with all services
 build: docker-build
-	@echo "🚀 Building Micro Platform (Single RPM)..."
+	@echo "🚀 Building Platform (Single RPM)..."
 	@chmod +x scripts/build.sh
 	@./scripts/build.sh
 
