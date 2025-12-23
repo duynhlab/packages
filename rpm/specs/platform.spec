@@ -87,6 +87,8 @@ fi
 %config(noreplace) /opt/platform/apps/user-api/user-api.properties
 %config(noreplace) /opt/platform/apps/checkout-api/checkout-api.properties
 %config(noreplace) /opt/platform/apps/voter-api/voter-api.properties
+# Initialization scripts
+/opt/platform/lib/print-version.sh
 # Infrastructure configs
 /etc/nginx/conf.d/platform.conf
 /etc/redis/platform-redis.conf
@@ -207,8 +209,13 @@ else
 fi
 
 %changelog
-* Tue Oct 21 2025 Your Name <your.email@example.com> - 1.0.0-1
+* Mon Dec 23 2025 Duy Henry <duyhenryer@users.noreply.github.com> - 1.0.0-1
 - Initial release of Platform
 - Unified RPM package with all services
-- Systemd target orchestration
+- Systemd target orchestration (platform-all.target, platform-infra.target)
 - Nginx reverse proxy integration
+- Redis configuration integration
+- Version logging script (print-version.sh)
+- Port availability checks during installation
+- Automatic service startup after installation
+- Services included: api-server (8079), user-api (8080), checkout-api (8081), voter-api (8082)
