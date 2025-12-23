@@ -134,6 +134,11 @@ jobs:
         cp infra/redis/platform-redis.conf rpm/SOURCES/
         cp rpm/files/systemd/* rpm/SOURCES/
         
+        # Copy initialization scripts
+        if [ -d "rpm/platform/lib" ]; then
+            cp rpm/platform/lib/*.sh rpm/SOURCES/ 2>/dev/null || true
+        fi
+        
         # Verify
         find rpm/SOURCES -type f
 
