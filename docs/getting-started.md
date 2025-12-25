@@ -282,6 +282,64 @@ sudo systemctl disable platform-all.target
 sudo dnf remove platform
 ```
 
+**Note:** This will remove all platform files including:
+- Service binaries in `/opt/platform/apps/`
+- Configuration files in `/opt/platform/apps/`
+- Systemd service files
+- Log directories in `/var/log/platform/`
+
+### Reinstalling the Platform
+
+After uninstalling, you can reinstall the platform:
+
+```bash
+# Uninstall existing installation (if any)
+sudo systemctl stop platform-all.target || true
+sudo systemctl disable platform-all.target || true
+sudo dnf remove platform || true
+
+# Clean up any remaining files (optional)
+sudo rm -rf /opt/platform
+sudo rm -rf /var/log/platform
+sudo rm -f /etc/nginx/conf.d/platform.conf
+sudo rm -f /etc/redis/platform-redis.conf
+
+# Reinstall from RPM
+sudo dnf install dist/platform-*.rpm
+
+# Verify installation
+sudo systemctl status platform-all.target
+```
+
+### Upgrading the Platform
+
+To upgrade to a new version:
+
+```bash
+# Upgrade using dnf (recommended)
+sudo dnf upgrade dist/platform-*.rpm
+
+# Or install new version (will replace old version)
+sudo dnf install dist/platform-*.rpm
+
+# Restart services to apply changes
+sudo systemctl restart platform-all.target
+```
+
+**Note:** Configuration files marked with `%config(noreplace)` in the spec file will be preserved during upgrades. If you want to use new default configurations, backup your current configs first:
+
+```bash
+# Backup current configurations
+sudo cp -r /opt/platform/apps/conf /opt/platform/apps/conf.backup
+sudo cp /opt/platform/apps/*/ *.properties /opt/platform/apps/conf.backup/
+
+# Upgrade
+sudo dnf upgrade dist/platform-*.rpm
+
+# Restore configurations if needed
+sudo cp /opt/platform/apps/conf.backup/* /opt/platform/apps/conf/
+```
+
 ## Troubleshooting
 
 ### Build Fails with "No services found"
