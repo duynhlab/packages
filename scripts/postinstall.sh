@@ -70,13 +70,40 @@ configure_redis() {
     fi
     
     # Enable and start Redis
-    systemctl enable redis 2>/dev/null || true
-    if systemctl is-active --quiet redis; then
-        systemctl restart redis 2>/dev/null || true
-        echo "  [OK] Redis restarted"
+    # Detect Redis service name (redis on RPM, redis-server on DEB)
+    # Loop through known service names and use the first one that exists
+    REDIS_SERVICE=""
+    for service_name in redis redis-server; do
+        # Check if service unit file exists
+        if systemctl list-unit-files --type=service --no-pager 2>/dev/null | grep -q "^${service_name}.service"; then
+            REDIS_SERVICE="$service_name"
+            break
+        fi
+        # Also check if service is available (even if not installed)
+        if systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -q "${service_name}.service"; then
+            REDIS_SERVICE="$service_name"
+            break
+        fi
+    done
+    
+    if [ -z "$REDIS_SERVICE" ]; then
+        echo "  [WARNING] Redis service not found (checked: redis, redis-server)" >&2
+        echo "  [WARNING] Redis may need to be installed separately" >&2
+        echo "  [WARNING] Continuing without starting Redis service..." >&2
     else
-        systemctl start redis 2>/dev/null || true
-        echo "  [OK] Redis started"
+        echo "  [INFO] Found Redis service: $REDIS_SERVICE"
+        systemctl enable "$REDIS_SERVICE" 2>/dev/null || true
+        if systemctl is-active --quiet "$REDIS_SERVICE" 2>/dev/null; then
+            systemctl restart "$REDIS_SERVICE" 2>/dev/null || true
+            echo "  [OK] Redis ($REDIS_SERVICE) restarted"
+        else
+            systemctl start "$REDIS_SERVICE" 2>/dev/null || true
+            if systemctl is-active --quiet "$REDIS_SERVICE" 2>/dev/null; then
+                echo "  [OK] Redis ($REDIS_SERVICE) started"
+            else
+                echo "  [WARNING] Failed to start Redis ($REDIS_SERVICE)" >&2
+            fi
+        fi
     fi
 }
 
