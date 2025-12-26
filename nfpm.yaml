@@ -1,0 +1,283 @@
+# nFPM Configuration for Platform Package
+# Documentation: https://nfpm.goreleaser.com
+
+name: platform
+version: "1.0.0"
+release: "1"
+arch: amd64
+platform: linux
+section: default
+priority: extra
+maintainer: Duy Henry <duyhenryer@users.noreply.github.com>
+description: |
+  Complete service platform with:
+  - api-server (port 8079)
+  - user-api (port 8080)
+  - checkout-api (port 8081)
+  - voter-api (port 8082)
+  - nginx reverse proxy (port 80)
+  - redis cache (port 6379)
+  This package provides a unified platform with all services bundled together.
+  Install once and get all services running with proper orchestration.
+vendor: Platform Team
+homepage: https://github.com/duyhenryer/rpm-builder
+license: MIT
+
+# Dependencies (common for all formats)
+depends:
+  - systemd
+
+# File contents mapping
+contents:
+  # Application directory tree (recursive copy)
+  - src: build/platform/apps
+    dst: /opt/platform/apps
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  # Service binaries (executable permissions)
+  - src: build/platform/apps/api-server/api-server
+    dst: /opt/platform/apps/api-server/api-server
+    type: file
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/user-api/user-api
+    dst: /opt/platform/apps/user-api/user-api
+    type: file
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/checkout-api/checkout-api
+    dst: /opt/platform/apps/checkout-api/checkout-api
+    type: file
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/voter-api/voter-api
+    dst: /opt/platform/apps/voter-api/voter-api
+    type: file
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  # Config files (marked as config type for noreplace behavior)
+  - src: build/platform/apps/common/*.properties
+    dst: /opt/platform/apps/common
+    type: config|noreplace
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/api-server/api-server.properties
+    dst: /opt/platform/apps/api-server/api-server.properties
+    type: config|noreplace
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/user-api/user-api.properties
+    dst: /opt/platform/apps/user-api/user-api.properties
+    type: config|noreplace
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/checkout-api/checkout-api.properties
+    dst: /opt/platform/apps/checkout-api/checkout-api.properties
+    type: config|noreplace
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/apps/voter-api/voter-api.properties
+    dst: /opt/platform/apps/voter-api/voter-api.properties
+    type: config|noreplace
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  # Initialization scripts directory
+  - src: build/platform/lib
+    dst: /opt/platform/lib
+    type: dir
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  # Initialization scripts (executable)
+  - src: build/platform/lib/print-version.sh
+    dst: /opt/platform/lib/print-version.sh
+    type: file
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  
+  # Infrastructure configs
+  - src: build/platform/infra/nginx/platform.conf
+    dst: /etc/nginx/conf.d/platform.conf
+    type: file
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/infra/redis/platform-redis.conf
+    dst: /etc/redis/platform-redis.conf
+    type: file
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  # Systemd units - RPM format (uses /usr/lib/systemd/system)
+  - src: build/platform/systemd/platform-all.target
+    dst: /usr/lib/systemd/system/platform-all.target
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-infra.target
+    dst: /usr/lib/systemd/system/platform-infra.target
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-api-server.service
+    dst: /usr/lib/systemd/system/platform-api-server.service
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-user-api.service
+    dst: /usr/lib/systemd/system/platform-user-api.service
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-checkout-api.service
+    dst: /usr/lib/systemd/system/platform-checkout-api.service
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-voter-api.service
+    dst: /usr/lib/systemd/system/platform-voter-api.service
+    type: file
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  # Systemd units - DEB format (uses /lib/systemd/system)
+  - src: build/platform/systemd/platform-all.target
+    dst: /lib/systemd/system/platform-all.target
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-infra.target
+    dst: /lib/systemd/system/platform-infra.target
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-api-server.service
+    dst: /lib/systemd/system/platform-api-server.service
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-user-api.service
+    dst: /lib/systemd/system/platform-user-api.service
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-checkout-api.service
+    dst: /lib/systemd/system/platform-checkout-api.service
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  
+  - src: build/platform/systemd/platform-voter-api.service
+    dst: /lib/systemd/system/platform-voter-api.service
+    type: file
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
+# Installation scripts
+scripts:
+  preinstall: scripts/preinstall.sh
+  postinstall: scripts/postinstall.sh
+  preremove: scripts/preremove.sh
+  postremove: scripts/postremove.sh
+
+# Format-specific overrides
+overrides:
+  # RPM-specific configuration
+  rpm:
+    # RPM dependencies
+    depends:
+      - nginx >= 1.20
+      - redis >= 6.0
+      - systemd
+  
+  # DEB-specific configuration
+  deb:
+    # DEB dependencies
+    depends:
+      - nginx (>= 1.20)
+      - redis-server (>= 6.0)
+      - systemd

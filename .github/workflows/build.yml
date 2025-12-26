@@ -1,0 +1,102 @@
+name: Build Packages (nFPM)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g., 1.2.3)'
+        required: false
+        type: string
+      release:
+        description: 'Package release number'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  build:
+    name: Build Packages
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: false
+
+    - name: Install nFPM
+      run: |
+        echo "Installing nFPM v2.44.1..."
+        go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.44.1
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        nfpm --version
+
+    # Version determination with priority: Manual input > Git tag > Default
+    - name: Determine version
+      id: version
+      if: github.event_name != 'pull_request'
+      run: |
+        # Priority 1: Manual input (workflow_dispatch)
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+          echo "Using manual input version: ${{ inputs.version }}"
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "release=${{ inputs.release || '1' }}" >> $GITHUB_OUTPUT
+        
+        # Priority 2: Git tag (tag push)
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Using tag version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release=1" >> $GITHUB_OUTPUT
+        
+        # Priority 3: Default
+        else
+          echo "Using default version: 1.0.0"
+          echo "version=1.0.0" >> $GITHUB_OUTPUT
+          echo "release=1" >> $GITHUB_OUTPUT
+        fi
+
+    # Update nfpm.yaml with determined version
+    - name: Update nfpm.yaml with version
+      if: github.event_name != 'pull_request'
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        RELEASE="${{ steps.version.outputs.release }}"
+        
+        # Update version in nfpm.yaml
+        sed -i "s/^version:.*/version: \"$VERSION\"/" nfpm.yaml
+        sed -i "s/^release:.*/release: \"$RELEASE\"/" nfpm.yaml
+        
+        # Verify changes
+        echo "Updated nfpm.yaml:"
+        grep "^version:" nfpm.yaml
+        grep "^release:" nfpm.yaml
+
+    - name: Build packages with nFPM
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "Building packages with nFPM..."
+        chmod +x scripts/build-nfpm.sh
+        PACKAGE_FORMATS="rpm deb" ./scripts/build-nfpm.sh
+        echo ""
+        echo "Generated packages:"
+        ls -lh dist/*.{rpm,deb} 2>/dev/null || true
+
+    - name: Upload artifacts
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: packages
+        path: dist/*.{rpm,deb}
+        retention-days: 30

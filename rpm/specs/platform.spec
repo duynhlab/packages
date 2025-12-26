@@ -4,7 +4,7 @@ Release:        1
 Summary:        Platform - All Services
 License:        MIT
 URL:            https://github.com/duyhenryer/rpm-builder
-BuildRequires:  golang >= 1.25
+# BuildRequires removed - we use pre-built binaries, not building from source in RPM
 Requires:       nginx >= 1.20, redis >= 6.0, systemd
 
 %description
@@ -173,13 +173,6 @@ else
 fi
 
 echo "Platform installed successfully!"
-echo "Services:"
-echo "  - api-server: http://localhost:8079/"
-echo "  - user-api: http://localhost:8080/"
-echo "  - checkout-api: http://localhost:8081/"
-echo "  - voter-api: http://localhost:8082/"
-echo "  - nginx: http://localhost:80/"
-echo "  - redis: localhost:6379"
 echo ""
 echo "Control all services:"
 echo "  systemctl start platform-all.target"
@@ -209,13 +202,7 @@ else
 fi
 
 %changelog
-* Mon Dec 23 2025 Duy Henry <duyhenryer@users.noreply.github.com> - 1.0.0-1
-- Initial release of Platform
-- Unified RPM package with all services
-- Systemd target orchestration (platform-all.target, platform-infra.target)
-- Nginx reverse proxy integration
-- Redis configuration integration
-- Version logging script (print-version.sh)
-- Port availability checks during installation
-- Automatic service startup after installation
-- Services included: api-server (8079), user-api (8080), checkout-api (8081), voter-api (8082)
+* Thu Dec 26 2024 Duy Henry <duyhenryer@users.noreply.github.com> - 1.0.0-1
+- Initial release of Platform package
+- Includes all services: api-server, user-api, checkout-api, voter-api
+- Includes nginx reverse proxy and Redis cache integration
