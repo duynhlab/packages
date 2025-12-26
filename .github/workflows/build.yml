@@ -98,5 +98,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: packages
-        path: dist/*.{rpm,deb}
+        path: |
+          dist/*.rpm
+          dist/*.deb
         retention-days: 30
