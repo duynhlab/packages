@@ -5,8 +5,23 @@
 set -e
 
 # Script parameters:
-# $1: Install action (1=install, 2=upgrade, 0=remove)
+# $1: Install action
+#   RPM: 1=install, 2=upgrade, 0=remove
+#   DEB: "install", "upgrade", "remove", "abort-install", "abort-upgrade", "abort-remove"
 INSTALL_ACTION="${1:-1}"
+
+# Normalize install action to numeric format for comparison
+# DEB uses strings, RPM uses numbers
+if [ "$INSTALL_ACTION" = "install" ] || [ "$INSTALL_ACTION" = "abort-install" ]; then
+    INSTALL_ACTION_NUM=1
+elif [ "$INSTALL_ACTION" = "upgrade" ] || [ "$INSTALL_ACTION" = "abort-upgrade" ]; then
+    INSTALL_ACTION_NUM=2
+elif [ "$INSTALL_ACTION" = "remove" ] || [ "$INSTALL_ACTION" = "abort-remove" ]; then
+    INSTALL_ACTION_NUM=0
+else
+    # Assume it's already numeric (RPM format)
+    INSTALL_ACTION_NUM="$INSTALL_ACTION"
+fi
 
 # Ports required by platform services
 # Format: single ports or ranges (start-end)
@@ -116,8 +131,8 @@ create_log_directories() {
 # ============================================================================
 
 main() {
-    # Detect install vs upgrade
-    if [ "$INSTALL_ACTION" -gt 1 ]; then
+    # Detect install vs upgrade (use normalized numeric value)
+    if [ "$INSTALL_ACTION_NUM" -gt 1 ]; then
         echo "Pre-install: Upgrade detected (action=$INSTALL_ACTION)"
         echo "Stopping services for upgrade..."
         systemctl stop platform-all.target 2>/dev/null || true

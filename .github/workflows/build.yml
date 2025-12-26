@@ -113,6 +113,11 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y nginx redis-server systemd || true
         
+        # Stop services that may conflict with port checks
+        echo "[INFO] Stopping conflicting services for installation test..."
+        sudo systemctl stop redis-server 2>/dev/null || true
+        sudo systemctl stop nginx 2>/dev/null || true
+        
         # Install DEB package
         echo "[INFO] Installing DEB package..."
         sudo dpkg -i "$DEB_FILE" || {

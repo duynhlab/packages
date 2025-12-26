@@ -5,8 +5,21 @@
 set -e
 
 # Script parameters:
-# $1: Remove action (0=remove, 1=upgrade)
+# $1: Remove action
+#   RPM: 0=remove, 1=upgrade
+#   DEB: "remove", "upgrade", "deconfigure", "abort-remove", "abort-upgrade", "abort-deconfigure"
 REMOVE_ACTION="${1:-0}"
+
+# Normalize remove action to numeric format for comparison
+# DEB uses strings, RPM uses numbers
+if [ "$REMOVE_ACTION" = "remove" ] || [ "$REMOVE_ACTION" = "deconfigure" ] || [ "$REMOVE_ACTION" = "abort-remove" ] || [ "$REMOVE_ACTION" = "abort-deconfigure" ]; then
+    REMOVE_ACTION_NUM=0
+elif [ "$REMOVE_ACTION" = "upgrade" ] || [ "$REMOVE_ACTION" = "abort-upgrade" ]; then
+    REMOVE_ACTION_NUM=1
+else
+    # Assume it's already numeric (RPM format)
+    REMOVE_ACTION_NUM="$REMOVE_ACTION"
+fi
 
 # Log directory base path
 LOG_BASE="/var/log/platform"
@@ -50,7 +63,7 @@ remove_log_directories() {
 
 main() {
     # Only perform removal actions (not upgrade)
-    if [ "$REMOVE_ACTION" -eq 0 ]; then
+    if [ "$REMOVE_ACTION_NUM" -eq 0 ]; then
         echo "Pre-remove: Package removal detected (action=$REMOVE_ACTION)"
         
         # Stop services

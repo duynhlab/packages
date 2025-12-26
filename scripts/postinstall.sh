@@ -5,8 +5,23 @@
 set -e
 
 # Script parameters:
-# $1: Install action (1=install, 2=upgrade, 0=remove)
+# $1: Install action
+#   RPM: 1=install, 2=upgrade, 0=remove
+#   DEB: "install", "upgrade", "remove", "abort-install", "abort-upgrade", "abort-remove"
 INSTALL_ACTION="${1:-1}"
+
+# Normalize install action to numeric format for comparison
+# DEB uses strings, RPM uses numbers
+if [ "$INSTALL_ACTION" = "install" ] || [ "$INSTALL_ACTION" = "abort-install" ]; then
+    INSTALL_ACTION_NUM=1
+elif [ "$INSTALL_ACTION" = "upgrade" ] || [ "$INSTALL_ACTION" = "abort-upgrade" ]; then
+    INSTALL_ACTION_NUM=2
+elif [ "$INSTALL_ACTION" = "remove" ] || [ "$INSTALL_ACTION" = "abort-remove" ]; then
+    INSTALL_ACTION_NUM=0
+else
+    # Assume it's already numeric (RPM format)
+    INSTALL_ACTION_NUM="$INSTALL_ACTION"
+fi
 
 # Platform installation paths
 PLATFORM_BASE="/opt/platform"
@@ -180,7 +195,7 @@ display_success_message() {
 
 main() {
     # Detect install vs upgrade
-    if [ "$INSTALL_ACTION" -gt 1 ]; then
+    if [ "$INSTALL_ACTION_NUM" -gt 1 ]; then
         echo "Post-install: Upgrade detected (action=$INSTALL_ACTION)"
     else
         echo "Post-install: Fresh installation (action=$INSTALL_ACTION)"
@@ -199,7 +214,7 @@ main() {
     reload_systemd
     
     # Run initialization scripts
-    run_init_scripts "$([ "$INSTALL_ACTION" -gt 1 ] && echo "upgrade" || echo "install")"
+    run_init_scripts "$([ "$INSTALL_ACTION_NUM" -gt 1 ] && echo "upgrade" || echo "install")"
     
     # Start platform services
     start_platform_services
