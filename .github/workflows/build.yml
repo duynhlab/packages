@@ -93,6 +93,102 @@ jobs:
         echo "Generated packages:"
         ls -lh dist/*.{rpm,deb} 2>/dev/null || true
 
+    - name: Test DEB package installation
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "Testing DEB package installation..."
+        
+        # Find DEB package
+        DEB_FILE=$(ls dist/*.deb 2>/dev/null | head -n1)
+        if [ -z "$DEB_FILE" ]; then
+          echo "[ERROR] No DEB package found in dist/"
+          exit 1
+        fi
+        
+        echo "[INFO] Found DEB package: $DEB_FILE"
+        echo "[INFO] Package size: $(du -h "$DEB_FILE" | cut -f1)"
+        
+        # Install dependencies (nginx, redis-server, systemd)
+        echo "[INFO] Installing dependencies..."
+        sudo apt-get update -qq
+        sudo apt-get install -y nginx redis-server systemd || true
+        
+        # Install DEB package
+        echo "[INFO] Installing DEB package..."
+        sudo dpkg -i "$DEB_FILE" || {
+          echo "[WARNING] dpkg install had issues, checking dependencies..."
+          sudo apt-get install -f -y
+        }
+        
+        # Verify installation
+        echo "[INFO] Verifying installation..."
+        
+        # Check if binaries are installed
+        echo "[INFO] Checking installed binaries..."
+        for service in api-server user-api checkout-api voter-api; do
+          if [ -f "/opt/platform/apps/$service/$service" ]; then
+            echo "  [OK] Binary installed: /opt/platform/apps/$service/$service"
+            ls -lh "/opt/platform/apps/$service/$service"
+          else
+            echo "  [ERROR] Binary not found: /opt/platform/apps/$service/$service"
+            exit 1
+          fi
+        done
+        
+        # Check if configs are installed
+        echo "[INFO] Checking installed configs..."
+        if [ -f "/opt/platform/apps/api-server/api-server.properties" ]; then
+          echo "  [OK] Config installed: /opt/platform/apps/api-server/api-server.properties"
+        else
+          echo "  [ERROR] Config not found: /opt/platform/apps/api-server/api-server.properties"
+          exit 1
+        fi
+        
+        # Check if systemd units are installed
+        echo "[INFO] Checking systemd units..."
+        for unit in platform-api-server.service platform-user-api.service platform-checkout-api.service platform-voter-api.service platform-all.target; do
+          if [ -f "/lib/systemd/system/$unit" ]; then
+            echo "  [OK] Systemd unit installed: /lib/systemd/system/$unit"
+          else
+            echo "  [ERROR] Systemd unit not found: /lib/systemd/system/$unit"
+            exit 1
+          fi
+        done
+        
+        # Check if infrastructure configs are installed
+        echo "[INFO] Checking infrastructure configs..."
+        if [ -f "/etc/nginx/conf.d/platform.conf" ]; then
+          echo "  [OK] Nginx config installed: /etc/nginx/conf.d/platform.conf"
+        else
+          echo "  [WARNING] Nginx config not found: /etc/nginx/conf.d/platform.conf"
+        fi
+        
+        if [ -f "/etc/redis/platform-redis.conf" ]; then
+          echo "  [OK] Redis config installed: /etc/redis/platform-redis.conf"
+        else
+          echo "  [WARNING] Redis config not found: /etc/redis/platform-redis.conf"
+        fi
+        
+        # Check systemd daemon-reload was done
+        echo "[INFO] Verifying systemd units are loaded..."
+        if systemctl list-unit-files | grep -q "platform-all.target"; then
+          echo "  [OK] Systemd units are loaded"
+        else
+          echo "  [WARNING] Systemd units may not be loaded"
+        fi
+        
+        # List all installed files (summary)
+        echo "[INFO] Summary of installed files:"
+        echo "  Binaries:"
+        find /opt/platform/apps -type f -name "*api" -exec ls -lh {} \;
+        echo "  Configs:"
+        find /opt/platform/apps -type f -name "*.properties" | head -5
+        echo "  Systemd units:"
+        ls -lh /lib/systemd/system/platform-* 2>/dev/null | head -5
+        
+        echo ""
+        echo "[SUCCESS] DEB package installation test passed!"
+
     - name: Upload artifacts
       if: github.event_name != 'pull_request'
       uses: actions/upload-artifact@v4
