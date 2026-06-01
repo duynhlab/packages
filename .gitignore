@@ -11,3 +11,8 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Internal planning docs
+plan.md
+plan-spec.md
+AGENTS.md
