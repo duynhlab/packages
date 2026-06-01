@@ -75,9 +75,15 @@ jobs:
         working-directory: packages
         run: ./scripts/render-systemd.sh
 
-      - name: Build all RPMs (nfpm in docker)
+      - name: Stage Source0 tarball
         working-directory: packages
-        run: ./scripts/build-rpm.sh all
+        run: ./scripts/stage-all.sh
+
+      - name: Build mega-RPM (rpmbuild in container)
+        working-directory: packages
+        env:
+          BUILD_RUNNER: docker
+        run: ./scripts/build-rpm.sh
 
       - name: List artefacts
         working-directory: packages
