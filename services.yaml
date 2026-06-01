@@ -1,0 +1,146 @@
+# services.yaml — single source of truth for duynhlab/packages
+# All build scripts, nfpm templates, and CI workflows render from this file.
+# See plan.md § 1.5 (systemd schema) and § 1.8 (local-build).
+#
+# Schema:
+#   name          short service identifier (used in RPM name as duynhlab-<name>)
+#   repo          GitHub repo (owner/name)
+#   src_dir       directory under $DUYNHLAB_SRC_ROOT (defaults to basename of repo)
+#   binary        output binary name (defaults to name + "-service")
+#   build_path    Go package main path (default ./cmd)
+#   port          listen port (used by duynhlab-ctl health)
+#   type          backend | static
+#   database      {name, app_user, migrator_user} — omit if no DB
+#   dependencies  {after: [...], env_files: [...]} — extra systemd After= / EnvironmentFile=
+
+services:
+  - name: auth
+    repo: duynhlab/auth-service
+    src_dir: auth-service
+    binary: auth-service
+    build_path: ./cmd
+    port: 8001
+    type: backend
+    database:
+      name: duynhlab_auth
+      app_user: duynhlab_auth_app
+      migrator_user: duynhlab_auth_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: user
+    repo: duynhlab/user-service
+    src_dir: user-service
+    binary: user-service
+    build_path: ./cmd
+    port: 8002
+    type: backend
+    database:
+      name: duynhlab_user
+      app_user: duynhlab_user_app
+      migrator_user: duynhlab_user_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: product
+    repo: duynhlab/product-service
+    src_dir: product-service
+    binary: product-service
+    build_path: ./cmd
+    port: 8003
+    type: backend
+    database:
+      name: duynhlab_product
+      app_user: duynhlab_product_app
+      migrator_user: duynhlab_product_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: cart
+    repo: duynhlab/cart-service
+    src_dir: cart-service
+    binary: cart-service
+    build_path: ./cmd
+    port: 8004
+    type: backend
+    database:
+      name: duynhlab_cart
+      app_user: duynhlab_cart_app
+      migrator_user: duynhlab_cart_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: order
+    repo: duynhlab/order-service
+    src_dir: order-service
+    binary: order-service
+    build_path: ./cmd
+    port: 8005
+    type: backend
+    database:
+      name: duynhlab_order
+      app_user: duynhlab_order_app
+      migrator_user: duynhlab_order_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: review
+    repo: duynhlab/review-service
+    src_dir: review-service
+    binary: review-service
+    build_path: ./cmd
+    port: 8006
+    type: backend
+    database:
+      name: duynhlab_review
+      app_user: duynhlab_review_app
+      migrator_user: duynhlab_review_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: notification
+    repo: duynhlab/notification-service
+    src_dir: notification-service
+    binary: notification-service
+    build_path: ./cmd
+    port: 8007
+    type: backend
+    database:
+      name: duynhlab_notification
+      app_user: duynhlab_notification_app
+      migrator_user: duynhlab_notification_migrator
+    dependencies:
+      after: [redis.service]
+      env_files: [/etc/duynhlab/common/redis.properties]
+
+  - name: shipping
+    repo: duynhlab/shipping-service
+    src_dir: shipping-service
+    binary: shipping-service
+    build_path: ./cmd
+    port: 8008
+    type: backend
+    database:
+      name: duynhlab_shipping
+      app_user: duynhlab_shipping_app
+      migrator_user: duynhlab_shipping_migrator
+    dependencies:
+      after: []
+      env_files: []
+
+  - name: frontend
+    repo: duynhlab/frontend
+    src_dir: frontend
+    binary: ""
+    build_path: ""
+    port: 3000
+    type: static
+    dependencies:
+      after: [nginx.service]
+      env_files: []

@@ -1,140 +1,41 @@
-# Platform - Multi-Format Package Builder
+# duynhlab/packages
 
-A unified service platform packaged as RPM, DEB, and other Linux package formats using nFPM. Build once, deploy everywhere with a single configuration.
+> **Status**: Refactor in progress (Phase 0 complete, Phase 1 in progress).
+> See [`plan.md`](./plan.md) for the full roadmap and [`AGENTS.md`](./AGENTS.md) for repo conventions.
 
-## Features
+Distribution layer for the duynhlab platform: repacks per-service Go binaries from upstream service repos into RPMs (and later DEBs), serves them via a YUM repository on GitHub Pages.
 
-- **Multiple Go Services**: Each service built as a separate binary from source code
-- **Multi-Format Packaging**: Generate RPM, DEB, IPK, and Arch Linux packages from a single `nfpm.yaml` configuration
-- **Unified Packaging**: Single package contains all services and configurations
-- **Systemd Orchestration**: Target-based service management with dependency handling
-- **Format-Specific Paths**: Automatically handles RPM vs DEB systemd path differences
-- **Nginx Integration**: Built-in reverse proxy configuration
-- **Redis Support**: Integrated caching layer
-- **Standardized Structure**: Clear directory organization (sources/, configs/, build/)
-- **Go 1.25**: Modern Go tooling and performance improvements
+## Scope (v1)
 
-## Quick Start
+- **Format**: RPM only (DEB → Phase 4)
+- **Target**: EL9 (Rocky/AlmaLinux 9), amd64
+- **Services**: 8 backend (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`) + 1 frontend
+- **Source of binaries**: GitHub Release tarballs of each `duynhlab/<svc>-service` repo
+
+## Layout
+
+```
+packages/
+├── plan.md                  Refactor tracking document
+├── AGENTS.md                Repo conventions for agents/humans
+├── services.yaml            (Phase 1) Single source of truth for service list
+├── packaging/rpm/           (Phase 1) nFPM templates + systemd units
+├── scripts/                 (Phase 1) build-local.sh, build-rpm.sh, render-*.sh, duynhlab-ctl, duynhlab-db-setup
+├── .github/workflows/       (Phase 1-2) create-rpm-service, smoke-test, publish-yum-repo, orchestrator
+└── docs/                    (Phase 3) install / release-process / adding-service / troubleshooting
+```
+
+POC code (`sources/`, `Dockerfile`, `rpm/specs/`, legacy systemd) has been removed in Phase 0. To inspect history: `git checkout archive/poc-v0`.
+
+## Getting started (after Phase 1)
 
 ```bash
-# Install nFPM (if not already installed)
-go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.44.1
-export PATH=$PATH:$(go env GOPATH)/bin
+# Local-build a service from sibling repo checkout (~/Working/Me/duynhlab/<svc>-service)
+make build-local SERVICE=auth
 
-# Build packages (RPM + DEB)
-make build
-
-# Or build specific format
-make build-rpm   # RPM only
-make build-deb   # DEB only
-make build-all   # All formats (RPM, DEB)
-
-# Install on target system
-# For RPM (RHEL/Rocky Linux):
-sudo dnf install dist/platform-*.rpm
-
-# For DEB (Debian/Ubuntu):
-sudo dpkg -i dist/platform-*.deb
-
-# Start all services
-sudo systemctl start platform-all.target
+# Then package
+make build SERVICE=auth VERSION=0.1.0-rc1
+ls dist/    # duynhlab-auth-0.1.0-rc1.el9.x86_64.rpm + duynhlab-common-*.rpm
 ```
 
-## Documentation
-
-- **[Getting Started](docs/getting-started.md)** - Step-by-step guide for newcomers
-- **[Build Process](docs/build-process.md)** - Detailed build flow documentation
-- **[Directory Structure](docs/directory-structure.md)** - Project organization and file structure
-
-## Project Structure
-
-```
-rpm-builder/
-├── sources/              # Go service source code (from multiple repositories)
-│   ├── api-server/
-│   ├── user-api/
-│   └── ...
-├── configs/              # All configuration files
-│   ├── apps/            # Application configs
-│   │   ├── common/      # Shared configs
-│   │   └── {service}/   # Service-specific configs
-│   └── infra/           # Infrastructure configs (nginx, redis)
-├── build/               # Build staging area (generated)
-│   └── platform/        # Files staged for packaging
-├── nfpm.yaml           # nFPM configuration (multi-format)
-├── scripts/             # Build scripts
-│   ├── build.sh        # Legacy RPM build (rpmbuild)
-│   ├── build-nfpm.sh   # nFPM build script
-│   ├── preinstall.sh   # Pre-installation script
-│   ├── postinstall.sh  # Post-installation script
-│   ├── preremove.sh    # Pre-removal script
-│   └── postremove.sh   # Post-removal script
-├── rpm/
-│   ├── specs/          # RPM specification (legacy - only used for make build-legacy)
-│   │   └── platform.spec  # NOT used by nFPM (nFPM uses nfpm.yaml instead)
-│   ├── files/systemd/  # Systemd service files
-│   └── platform/lib/  # Initialization scripts
-└── dist/               # Output packages (generated)
-```
-
-## Requirements
-
-- **Go 1.25+** - Required for building service binaries and nFPM
-- **nFPM v2.44.1** - Package builder (install with `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.44.1`)
-- **Make** - For running build commands
-- **Docker** (optional) - Only needed for legacy `make build-legacy` command
-
-## Makefile Targets
-
-| Target | Description |
-|--------|-------------|
-| `make build` | Build packages with nFPM (RPM + DEB) [DEFAULT] |
-| `make build-rpm` | Build RPM package only |
-| `make build-deb` | Build DEB package only |
-| `make build-all` | Build all formats (RPM, DEB) |
-| `make build-nfpm` | Build packages with nFPM (RPM + DEB) |
-| `make build-legacy` | Build RPM using legacy rpmbuild (requires Docker) |
-| `make validate-nfpm` | Validate nfpm.yaml configuration |
-| `make docker-build` | Build Docker image (for legacy builds) |
-| `make clean` | Remove all build artifacts |
-
-## Package Formats
-
-This project generates packages for multiple Linux distributions:
-
-- **RPM** - For RHEL, Rocky Linux, CentOS, Fedora
-- **DEB** - For Debian, Ubuntu
-- **IPK** - For OpenWrt
-- **Arch Linux** - For Arch-based distributions
-
-All formats are generated from a single `nfpm.yaml` configuration file.
-
-## Installation Scripts
-
-The package includes refactored installation scripts:
-
-- **preinstall.sh** - Port availability checks, log directory creation
-- **postinstall.sh** - Service setup, Redis/Nginx configuration, service startup
-- **preremove.sh** - Service stop and disable
-- **postremove.sh** - Systemd daemon reload
-
-All scripts are modular, maintainable, and include better error handling.
-
-## CI/CD
-
-The GitHub Actions workflow (`.github/workflows/build-rpm.yml`) automatically:
-- Builds binaries from source
-- Generates RPM and DEB packages using nFPM
-- Uploads artifacts for download
-
-## Migration from Legacy Build
-
-If you were using the old `rpmbuild` workflow:
-- **Legacy build still available**: `make build-legacy` (uses `rpm/specs/platform.spec`)
-- **New default**: `make build` uses nFPM (uses `nfpm.yaml`, NOT `platform.spec`)
-- **Important**: `rpm/specs/platform.spec` is ONLY used for legacy builds, not for nFPM
-- Old RPM spec backed up: `rpm/specs/platform.spec.backup`
-
-## License
-
-MIT
+See `plan.md` Phase 1 for the full pilot flow and `docs/install.md` (added in Phase 3) for end-user installation.

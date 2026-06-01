@@ -1,0 +1,135 @@
+name: publish-yum-repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to check out for every service repo (branch/tag/sha)"
+        required: false
+        default: main
+  workflow_run:
+    workflows: ["build-rpms"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  DUYNHLAB_SRC_ROOT: ${{ github.workspace }}/src
+  BASE_URL: https://duynhlab.github.io/packages
+  CREATEREPO_RUNNER: docker
+
+jobs:
+  build-and-publish:
+    name: Build RPMs + publish to gh-pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          path: packages
+
+      - name: Checkout gh-pages (will be created if missing)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 1
+        continue-on-error: true
+
+      - name: Initialise gh-pages branch if absent
+        run: |
+          if [ ! -d gh-pages/.git ]; then
+            mkdir -p gh-pages
+            cd gh-pages
+            git init -b gh-pages
+            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            : > .nojekyll
+            git add .nojekyll
+            git -c user.email=ops@duynhlab.io -c user.name="duynhlab-ops" \
+              commit -m "Initial gh-pages branch"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          check-latest: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext-base curl tar
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Fetch service source
+        working-directory: packages
+        run: ./scripts/fetch-sources.sh "${{ github.event.inputs.ref || 'main' }}"
+
+      - name: Build all services
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          for svc in $(yq '.services[].name' services.yaml); do
+            echo "::group::build-local $svc"
+            ./scripts/build-local.sh "$svc"
+            echo "::endgroup::"
+          done
+
+      - name: Render systemd units
+        working-directory: packages
+        run: ./scripts/render-systemd.sh
+
+      - name: Build mega-RPM
+        working-directory: packages
+        run: ./scripts/build-rpm.sh
+
+      - name: Stage YUM repo into gh-pages tree
+        working-directory: packages
+        env:
+          REPO_OUT: ${{ github.workspace }}/gh-pages
+          BASE_URL: ${{ env.BASE_URL }}
+        run: ./scripts/publish-yum-repo.sh
+
+      - name: Commit + push gh-pages
+        working-directory: gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.email "ops@duynhlab.io"
+          git config user.name  "duynhlab-ops"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No repo changes to publish"
+            exit 0
+          fi
+          git commit -m "publish: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+          git push origin gh-pages
+
+      - name: Print final URLs
+        run: |
+          echo "Repo:       $BASE_URL"
+          echo ".repo file: $BASE_URL/duynhlab.repo"
+          echo "RPMs:       $BASE_URL/rpm/el9/x86_64/"

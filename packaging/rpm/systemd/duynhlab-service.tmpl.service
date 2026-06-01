@@ -1,0 +1,43 @@
+[Unit]
+Description=duynhlab ${SERVICE_NAME} service
+Documentation=https://duynhlab.github.io/packages
+After=network-online.target duynhlab-infra.target${EXTRA_AFTER}
+Wants=network-online.target duynhlab-infra.target
+PartOf=duynhlab-platform.target
+
+[Service]
+Type=exec
+User=duynhlab
+Group=duynhlab
+WorkingDirectory=/opt/duynhlab/${SERVICE_NAME}
+
+EnvironmentFile=-/etc/duynhlab/env-global.properties
+${EXTRA_ENV_FILES}EnvironmentFile=/etc/duynhlab/${SERVICE_NAME}.env
+EnvironmentFile=-/etc/duynhlab/${SERVICE_NAME}.override
+
+ExecStart=/opt/duynhlab/${SERVICE_NAME}/bin/${BINARY_NAME}
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=duynhlab-${SERVICE_NAME}
+
+[Install]
+WantedBy=duynhlab-platform.target

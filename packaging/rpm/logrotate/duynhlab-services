@@ -1,0 +1,15 @@
+# /etc/logrotate.d/duynhlab-services
+# Rotate per-service application logs written by Go services to journald +
+# (optionally) /var/log/duynhlab/<svc>/*.log when JOURNAL_DISABLED=1.
+
+/var/log/duynhlab/*/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 duynhlab duynhlab
+    sharedscripts
+}

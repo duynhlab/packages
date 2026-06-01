@@ -1,81 +1,73 @@
-# Platform - Multi-Format Package Builder
+# duynhlab/packages — RPM SPEC mega-package builder
+#
+# Option A: single monorepo SPEC at specs/duynhlab.spec produces ONE RPM
+# (duynhlab-<VERSION>-1.el9.x86_64.rpm) containing all 8 backends + frontend
+# + CLI tools + nginx/valkey/postgresql config templates.
 
-.PHONY: help validate docker-build build build-nfpm build-rpm build-deb build-legacy clean
+.PHONY: help all fetch-sources build-local build-local-all render-systemd \
+        stage build smoke smoke-full publish-repo clean
 
-# Default target
+SERVICE          ?=
+VERSION          ?= $(shell date -u +%Y.%m.%d)
+DUYNHLAB_SRC_ROOT ?= $(abspath ..)
+
+export VERSION
+export DUYNHLAB_SRC_ROOT
+
 help:
-	@echo "Platform - Available targets:"
+	@echo "duynhlab/packages — RPM SPEC pipeline (mega-RPM)"
 	@echo ""
-	@echo "  validate       - Validate nfpm.yaml configuration"
-	@echo "  build          - Build packages with nFPM (RPM + DEB) [DEFAULT]"
-	@echo "  build-nfpm     - Build packages using nFPM (RPM + DEB)"
-	@echo "  build-rpm      - Build RPM package only"
-	@echo "  build-deb      - Build DEB package only"
-	@echo "  build-legacy   - Build single RPM with rpmbuild (legacy)"
-	@echo "  docker-build   - Build Docker image (for legacy RPM build)"
-	@echo "  clean          - Clean build artifacts"
+	@echo "  fetch-sources [REF=main]   Clone every service repo into \$$DUYNHLAB_SRC_ROOT"
+	@echo "  build-local SERVICE=<name> Build one service from sibling checkout"
+	@echo "  build-local-all            Build every service in services.yaml"
+	@echo "  render-systemd             Render unit + target files (build/staging/systemd/)"
+	@echo "  stage                      Assemble the Source0 staging tarball"
+	@echo "  build                      Run rpmbuild (host or container) -> dist/"
+	@echo "  smoke                      Install dist/*.rpm in Rocky 9 + verify"
+	@echo "  smoke-full                 Full smoke: podman --systemd=always + Postgres sidecar"
+	@echo "  publish-repo               Stage gh-pages YUM repo (build/gh-pages/)"
+	@echo "  all                        stage + build + smoke"
+	@echo "  clean                      Remove build/ and dist/"
 	@echo ""
-	@echo "Examples:"
-	@echo "  make validate      # Validate nfpm.yaml configuration"
-	@echo "  make build         # Build RPM and DEB packages"
-	@echo "  make build-rpm     # Build RPM package only"
-	@echo "  make build-deb     # Build DEB package only"
+	@echo "Environment:"
+	@echo "  VERSION=$(VERSION)"
+	@echo "  DUYNHLAB_SRC_ROOT=$(DUYNHLAB_SRC_ROOT)"
+	@echo "  BUILD_RUNNER=host|podman|docker  (auto)"
+	@echo "  SKIP_MIGRATE_DOWNLOAD=1          skip golang-migrate fetch"
 
-# Validate nFPM configuration
-validate:
-	@echo "[INFO] Validating nfpm.yaml..."
-	@if command -v nfpm >/dev/null 2>&1 || [ -f "$$(go env GOPATH)/bin/nfpm" ]; then \
-		export PATH="$$PATH:$$(go env GOPATH)/bin"; \
-		echo "[INFO] Testing nFPM package generation..."; \
-		nfpm package --packager rpm --target /tmp --config nfpm.yaml 2>&1 | head -20 || echo "[WARNING] Package generation test failed"; \
-		echo "[SUCCESS] nfpm.yaml syntax appears valid"; \
-	else \
-		echo "[ERROR] nfpm command not found"; \
-		echo "   Install with: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.44.1"; \
-		exit 1; \
-	fi
+fetch-sources:
+	@bash scripts/fetch-sources.sh $(REF)
 
-# Build Docker image
-docker-build:
-	@echo "[INFO] Building Docker image..."
-	@docker build -t rpm-builder:latest .
-	@echo "[SUCCESS] Docker image built: rpm-builder:latest"
+build-local:
+	@test -n "$(SERVICE)" || (echo "ERROR: SERVICE= required"; exit 1)
+	@bash scripts/build-local.sh $(SERVICE) $(VERSION)
 
-# Build packages with nFPM (default - generates RPM and DEB)
-build:
-	@echo "[INFO] Building Platform with nFPM (RPM + DEB)..."
-	@chmod +x scripts/build-nfpm.sh
-	@PACKAGE_FORMATS="rpm deb" ./scripts/build-nfpm.sh
+build-local-all:
+	@for s in $$(yq '.services[].name' services.yaml); do \
+	  echo "--- build-local $$s ---"; \
+	  bash scripts/build-local.sh $$s || exit 1; \
+	done
 
-# Build packages using nFPM (RPM + DEB)
-build-nfpm:
-	@echo "[INFO] Building Platform with nFPM (RPM + DEB)..."
-	@chmod +x scripts/build-nfpm.sh
-	@PACKAGE_FORMATS="rpm deb" ./scripts/build-nfpm.sh
+render-systemd:
+	@bash scripts/render-systemd.sh
 
-# Build RPM package only
-build-rpm:
-	@echo "[INFO] Building Platform RPM package..."
-	@chmod +x scripts/build-nfpm.sh
-	@PACKAGE_FORMATS="rpm" ./scripts/build-nfpm.sh
+stage:
+	@bash scripts/stage-all.sh
 
-# Build DEB package only
-build-deb:
-	@echo "[INFO] Building Platform DEB package..."
-	@chmod +x scripts/build-nfpm.sh
-	@PACKAGE_FORMATS="deb" ./scripts/build-nfpm.sh
+build: stage
+	@bash scripts/build-rpm.sh
 
-# Legacy build using rpmbuild (kept for backward compatibility)
-build-legacy: docker-build
-	@echo "[INFO] Building Platform (Single RPM - Legacy rpmbuild)..."
-	@chmod +x scripts/build.sh
-	@./scripts/build.sh
+smoke:
+	@bash scripts/smoke-install.sh
 
-# Clean up
+smoke-full:
+	@bash scripts/smoke-full.sh
+
+publish-repo:
+	@bash scripts/publish-yum-repo.sh
+
+all: stage build smoke
+
 clean:
-	@echo "[INFO] Cleaning up..."
-	@rm -rf dist/
-	@rm -rf build/
-	@rm -rf rpm/BUILD rpm/BUILDROOT rpm/RPMS rpm/SRPMS rpm/SOURCES
-	@rm -f sources/user-api/user-api sources/checkout-api/checkout-api sources/voter-api/voter-api sources/api-server/api-server
-	@echo "[SUCCESS] Cleanup completed!"
+	@rm -rf dist/ build/
+	@echo "Cleaned."
