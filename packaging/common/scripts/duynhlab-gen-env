@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# duynhlab-gen-env <service>
+#
+# Render /etc/duynhlab/<svc>.env from /opt/duynhlab/secret-tpl/<svc>.env.tpl
+# substituting __DB_PASSWORD__ with a fresh random 32-char string.
+# Idempotent: refuses to overwrite an existing env file unless --force.
+set -eu
+
+PROG=${0##*/}
+TPL_DIR=${TPL_DIR:-/opt/duynhlab/secret-tpl}
+ETC=${ETC:-/etc/duynhlab}
+GEN_PASS=${GEN_PASS:-/opt/duynhlab/lib/duynhlab-gen-password}
+
+force=0
+svc=""
+for arg in "$@"; do
+  case "$arg" in
+    -f|--force) force=1 ;;
+    -h|--help)
+      cat <<EOF
+$PROG <service> [--force]
+
+Generate /etc/duynhlab/<svc>.env from secret-tpl template.
+
+Options:
+  --force    Overwrite existing env file (default: refuse and exit 0).
+
+Env overrides: TPL_DIR, ETC, GEN_PASS
+EOF
+      exit 0 ;;
+    -*) echo "$PROG: unknown flag: $arg" >&2; exit 2 ;;
+    *)  svc="$arg" ;;
+  esac
+done
+
+[ -n "$svc" ] || { echo "$PROG: missing <service> argument" >&2; exit 2; }
+
+tpl="$TPL_DIR/$svc.env.tpl"
+env_file="$ETC/$svc.env"
+
+[ -f "$tpl" ] || { echo "$PROG: template not found: $tpl" >&2; exit 1; }
+
+if [ -f "$env_file" ] && [ "$force" -eq 0 ]; then
+  echo "$PROG: preserving existing $env_file (use --force to overwrite)" >&2
+  exit 0
+fi
+
+mkdir -p "$ETC"
+
+if [ -x "$GEN_PASS" ]; then
+  pass=$("$GEN_PASS" 32)
+else
+  pass=$(tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 32)
+fi
+
+umask 0027
+sed "s|__DB_PASSWORD__|${pass}|g" "$tpl" > "$env_file.tmp"
+mv -f "$env_file.tmp" "$env_file"
+chown root:duynhlab "$env_file" 2>/dev/null || :
+chmod 0640 "$env_file"
+
+echo "$PROG: wrote $env_file"
+exit 0

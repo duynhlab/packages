@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# duynhlab-ctl — operational wrapper around systemctl/journalctl for duynhlab services.
+#
+# Commands:
+#   list                        List all services declared in services.yaml
+#   start    <svc|all>          Start service(s)
+#   stop     <svc|all>          Stop service(s)
+#   restart  <svc|all>          Restart service(s)
+#   enable   <svc|all>          Enable on boot
+#   disable  <svc|all>          Disable on boot
+#   status   <svc|all>          Show systemd status
+#   logs     <svc> [args...]    Tail journal for service (passes args to journalctl)
+#   health   <svc|all>          curl /health on configured port
+#   version  <svc|all>          Print binary + schema versions
+#   config   <svc>              cat env file (masked password)
+#   ports    [filter]           Show port assignments
+set -euo pipefail
+
+PROG=${0##*/}
+SERVICES_YAML=${SERVICES_YAML:-/etc/duynhlab/services.yaml}
+OPT_BASE=${OPT_BASE:-/opt/duynhlab}
+ETC_BASE=${ETC_BASE:-/etc/duynhlab}
+
+if [[ -t 1 ]]; then
+  C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_GRN=$'\033[32m'; C_RED=$'\033[31m'; C_YEL=$'\033[33m'; C_RST=$'\033[0m'
+else
+  C_BOLD=; C_DIM=; C_GRN=; C_RED=; C_YEL=; C_RST=
+fi
+
+die() { echo "$PROG: $*" >&2; exit 1; }
+
+require_yq() { command -v yq >/dev/null 2>&1 || die "yq required (install: go install github.com/mikefarah/yq/v4@latest)"; }
+
+list_services() { require_yq; yq '.services[].name' "$SERVICES_YAML"; }
+svc_port() { yq ".services[] | select(.name==\"$1\") | .port" "$SERVICES_YAML"; }
+svc_type() { yq ".services[] | select(.name==\"$1\") | .type" "$SERVICES_YAML"; }
+
+resolve_targets() {
+  if [[ "$1" == "all" ]]; then list_services; else echo "$1"; fi
+}
+
+unit_name() { echo "duynhlab-$1.service"; }
+
+cmd_list() {
+  require_yq
+  printf "%-15s %-10s %-6s %-10s\n" "NAME" "TYPE" "PORT" "STATUS"
+  while read -r svc; do
+    local typ port stat
+    typ=$(svc_type "$svc")
+    port=$(svc_port "$svc")
+    stat=$(systemctl is-active "$(unit_name "$svc")" 2>/dev/null || echo "n/a")
+    case "$stat" in
+      active) stat="${C_GRN}${stat}${C_RST}" ;;
+      failed) stat="${C_RED}${stat}${C_RST}" ;;
+      *) stat="${C_DIM}${stat}${C_RST}" ;;
+    esac
+    printf "%-15s %-10s %-6s %-21s\n" "$svc" "$typ" "$port" "$stat"
+  done < <(list_services)
+}
+
+cmd_simple() {
+  local action=$1 target=$2
+  for svc in $(resolve_targets "$target"); do
+    echo "${C_BOLD}==> systemctl $action $(unit_name "$svc")${C_RST}"
+    systemctl "$action" "$(unit_name "$svc")"
+  done
+}
+
+cmd_logs() {
+  local svc=$1; shift || true
+  exec journalctl -u "$(unit_name "$svc")" "$@"
+}
+
+cmd_health() {
+  for svc in $(resolve_targets "$1"); do
+    local port; port=$(svc_port "$svc")
+    if [[ -z "$port" || "$port" == "null" ]]; then
+      echo "$svc: ${C_DIM}no port configured${C_RST}"; continue
+    fi
+    local resp
+    if resp=$(curl -fsS -m 3 "http://127.0.0.1:$port/health" 2>&1); then
+      echo "$svc (:$port): ${C_GRN}OK${C_RST} ${C_DIM}${resp:0:60}${C_RST}"
+    else
+      echo "$svc (:$port): ${C_RED}FAIL${C_RST} ${C_DIM}${resp}${C_RST}"
+    fi
+  done
+}
+
+cmd_version() {
+  for svc in $(resolve_targets "$1"); do
+    local bin sch
+    bin=$(cat "$OPT_BASE/$svc/BINARY_VERSION" 2>/dev/null || echo "unknown")
+    sch=$(cat "$OPT_BASE/$svc/SCHEMA_VERSION" 2>/dev/null || echo "n/a")
+    printf "%-15s binary=%-25s schema=%s\n" "$svc" "$bin" "$sch"
+  done
+}
+
+cmd_config() {
+  local svc=$1
+  local f="$ETC_BASE/$svc.env"
+  [[ -f "$f" ]] || die "No env file: $f"
+  sed 's/\(DB_PASSWORD=\).*/\1********/' "$f"
+}
+
+cmd_ports() {
+  require_yq
+  local filter=${1:-}
+  yq -r ".services[] | [.name, .port, .type] | @tsv" "$SERVICES_YAML" \
+    | { [[ -n "$filter" ]] && grep -i "$filter" || cat; } \
+    | column -t
+}
+
+usage() {
+  sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
+  exit 2
+}
+
+CMD=${1:-}
+[[ -n "$CMD" ]] || usage
+shift || true
+
+case "$CMD" in
+  list)               cmd_list ;;
+  start|stop|restart|enable|disable|status)
+                      [[ $# -ge 1 ]] || die "usage: $PROG $CMD <svc|all>"
+                      cmd_simple "$CMD" "$1" ;;
+  logs)               [[ $# -ge 1 ]] || die "usage: $PROG logs <svc> [journalctl args]"
+                      cmd_logs "$@" ;;
+  health)             cmd_health "${1:-all}" ;;
+  version)            cmd_version "${1:-all}" ;;
+  config)             [[ $# -ge 1 ]] || die "usage: $PROG config <svc>"
+                      cmd_config "$1" ;;
+  ports)              cmd_ports "${1:-}" ;;
+  -h|--help|help)     usage ;;
+  *)                  die "Unknown command: $CMD (try '$PROG help')" ;;
+esac

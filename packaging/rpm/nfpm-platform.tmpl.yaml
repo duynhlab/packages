@@ -1,0 +1,34 @@
+name: duynhlab-platform
+arch: noarch
+platform: linux
+version: ${VERSION}
+version_schema: none
+release: ${RELEASE}
+section: default
+priority: optional
+maintainer: "duynhlab <ops@duynhlab.io>"
+description: |
+  duynhlab platform meta-package. Installs all 8 backend services plus the
+  common tooling and infrastructure dependencies (nginx, redis).
+  Date-based version reflects the snapshot of all components on release day.
+vendor: duynhlab
+homepage: https://duynhlab.github.io/packages
+license: Proprietary
+
+depends:
+  - duynhlab-common
+  - duynhlab-auth
+  - duynhlab-user
+  - duynhlab-product
+  - duynhlab-cart
+  - duynhlab-order
+  - duynhlab-review
+  - duynhlab-notification
+  - duynhlab-shipping
+  - duynhlab-frontend
+  - nginx >= 1.20
+  - redis >= 6.0
+
+rpm:
+  group: Applications/Internet
+  compression: zstd

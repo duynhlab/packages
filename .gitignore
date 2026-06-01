@@ -1,23 +1,8 @@
 # Build artifacts
 dist/
 build/
-rpm/BUILD/
-rpm/BUILDROOT/
-rpm/RPMS/
-rpm/SRPMS/
-rpm/SOURCES/
-
-# Source code repos (cloned from GitHub)
-# repo/
-
-# App binaries (built artifacts - will be generated during build)
-apps/api-server/api-server
-apps/user-api/user-api
-apps/checkout-api/checkout-api
-apps/voter-api/voter-api
-
-# Docker
-.dockerignore
+*.rpm
+*.deb
 
 # IDE
 .vscode/

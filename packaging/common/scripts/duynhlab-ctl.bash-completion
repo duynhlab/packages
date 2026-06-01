@@ -1,0 +1,24 @@
+# bash completion for duynhlab-ctl
+_duynhlab_ctl() {
+  local cur prev words cword
+  _init_completion || return
+
+  local cmds="list start stop restart enable disable status logs health version config ports help"
+  if [[ $cword -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "$cmds" -- "$cur") )
+    return
+  fi
+
+  local svcs=""
+  if command -v yq >/dev/null 2>&1 && [[ -f /etc/duynhlab/services.yaml ]]; then
+    svcs=$(yq '.services[].name' /etc/duynhlab/services.yaml 2>/dev/null)
+  fi
+
+  case "${words[1]}" in
+    start|stop|restart|enable|disable|status|health|version)
+      COMPREPLY=( $(compgen -W "all $svcs" -- "$cur") ) ;;
+    logs|config)
+      COMPREPLY=( $(compgen -W "$svcs" -- "$cur") ) ;;
+  esac
+}
+complete -F _duynhlab_ctl duynhlab-ctl

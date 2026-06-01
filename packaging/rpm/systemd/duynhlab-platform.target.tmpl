@@ -1,0 +1,8 @@
+[Unit]
+Description=duynhlab platform (all backend services)
+Documentation=https://duynhlab.github.io/packages
+After=duynhlab-infra.target
+Wants=duynhlab-infra.target
+${WANTS_LINES}
+[Install]
+WantedBy=multi-user.target

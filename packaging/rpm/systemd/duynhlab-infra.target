@@ -1,0 +1,11 @@
+[Unit]
+Description=duynhlab external infrastructure (nginx, valkey, postgresql)
+Documentation=https://duynhlab.github.io/packages
+After=network-online.target
+Wants=network-online.target
+Wants=nginx.service
+Wants=postgresql.service
+Wants=valkey.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,8 +1,0 @@
-[Unit]
-Description=Platform All Services
-After=platform-infra.target
-Wants=platform-api-server.service platform-user-api.service platform-checkout-api.service platform-voter-api.service
-
-[Install]
-WantedBy=multi-user.target
-
