@@ -28,18 +28,18 @@ jobs:
 
     steps:
       - name: Checkout packages repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: packages
 
       - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "stable"
           check-latest: true
 
       - name: Set up Node (for frontend)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Upload RPM artefacts
         if: success() || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: duynhlab-rpms
           path: packages/dist/*.rpm
