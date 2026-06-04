@@ -80,20 +80,27 @@ The post-install scriptlet:
 
 ## 3. Bootstrap the database (one-time)
 
-Provide a PostgreSQL superuser DSN via `SUPERUSER_DSN` and let
-`duynhlab-db-setup` create one database + two roles per service (`app`,
-`migrator`), then apply migrations:
+`duynhlab-db-setup` is **per-service**: each invocation takes a single service
+name (`bootstrap <svc>` / `migrate <svc>`). It creates one database + two roles
+(`app`, `migrator`) for that service and stores the generated app-role password
+in `/etc/duynhlab/<svc>.env`.
+
+Provide a PostgreSQL superuser DSN via `SUPERUSER_DSN` and loop over the
+backend services:
 
 ```bash
-SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \
-  sudo -E duynhlab-db-setup bootstrap
+export SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres"
 
-sudo duynhlab-db-setup migrate
+for svc in auth user product cart order review notification shipping; do
+  sudo -E duynhlab-db-setup bootstrap "$svc"
+done
+
+for svc in auth user product cart order review notification shipping; do
+  sudo duynhlab-db-setup migrate "$svc"
+done
 ```
 
-`duynhlab-db-setup` reads `/etc/duynhlab/services.yaml` to know which services
-need a DB, and stores the generated app-role password in each
-`/etc/duynhlab/<svc>.env`.
+(`migrate` uses the migrator role and does not need `SUPERUSER_DSN`.)
 
 ## 4. Start the platform
 
@@ -115,7 +122,9 @@ journalctl -u 'duynhlab-*' -e --no-pager
 ```bash
 sudo dnf upgrade -y duynhlab
 # Apply any new migrations shipped in the new RPM:
-sudo duynhlab-db-setup migrate
+for svc in auth user product cart order review notification shipping; do
+  sudo duynhlab-db-setup migrate "$svc"
+done
 sudo systemctl restart duynhlab-platform.target
 ```
 
@@ -148,7 +157,7 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;" ...
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `dnf install` fails: `Curl error (60): SSL certificate problem` | Mirror reach is restricted | `dnf install --setopt=sslverify=false` once, then fix CA |
-| `systemctl start duynhlab-auth` fails: "schema version mismatch" | Forgot `duynhlab-db-setup migrate` after upgrade | Run it, then restart |
+| `systemctl start duynhlab-auth` fails: "schema version mismatch" | Forgot `duynhlab-db-setup migrate auth` after upgrade | Run it, then restart |
 | `nginx -t` fails after install | Existing `nginx.conf` already defines `server { listen 80; }` | Edit `/etc/nginx/nginx.conf` to remove the default `server` block; ours lives in `conf.d/duynhlab.conf` |
 | `duynhlab-ctl status` shows `inactive (dead)` | DB unreachable or password wrong | `grep DB_PASSWORD /etc/duynhlab/<svc>.env`, verify via `psql` |
 
@@ -170,5 +179,6 @@ sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo \
 sudo dnf install duynhlab
 ```
 
-See also: [`docs/release-process.md`](release-process.md) for the publish
-flow, and [`plan.md`](../plan.md) §2 for the broader Phase 2 design.
+See also: [`docs/README.md`](README.md) for the full documentation index —
+in particular [`build.md`](build.md) for the publish flow and
+[`operations.md`](operations.md) for day-2 operations.
