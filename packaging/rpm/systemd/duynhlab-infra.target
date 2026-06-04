@@ -1,7 +1,10 @@
 [Unit]
 Description=duynhlab external infrastructure (nginx, valkey, postgresql)
 Documentation=https://duynhlab.github.io/packages
-After=network-online.target
+# After= makes this target a real synchronization barrier: it is only reached
+# once nginx/postgresql/valkey have finished starting, so duynhlab backends
+# (which order After=duynhlab-infra.target) never race ahead of the database.
+After=network-online.target nginx.service postgresql.service valkey.service
 Wants=network-online.target
 Wants=nginx.service
 Wants=postgresql.service
