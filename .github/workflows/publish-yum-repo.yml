@@ -89,20 +89,45 @@ jobs:
         working-directory: packages
         run: ./scripts/stage-all.sh
 
+      - name: Compute version
+        id: ver
+        run: echo "version=$(date -u +%Y.%m.%d)" >> "$GITHUB_OUTPUT"
+
       - name: Build mega-RPM
         working-directory: packages
         env:
           BUILD_RUNNER: docker
+          VERSION: ${{ steps.ver.outputs.version }}
         run: ./scripts/build-rpm.sh
+
+      - name: Create GitHub Release + upload RPM
+        working-directory: packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          rpm=$(ls dist/duynhlab-*.x86_64.rpm | head -1)
+          echo "Release tag: $tag  asset: $rpm"
+          if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$tag" "$rpm" --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$tag" "$rpm" \
+              --repo "${{ github.repository }}" \
+              --title "duynhlab ${VERSION}" \
+              --notes "Mega-RPM for the duynhlab platform (EL9). Install via the YUM repo: https://duynhlab.github.io/packages"
+          fi
 
       - name: Stage YUM repo into gh-pages tree
         working-directory: packages
         env:
           REPO_OUT: ${{ github.workspace }}/gh-pages
           BASE_URL: ${{ env.BASE_URL }}
+          RELEASE_BASE_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.ver.outputs.version }}/
         run: ./scripts/publish-yum-repo.sh
 
-      - name: Commit + push gh-pages (durable accumulator)
+      - name: Commit + push gh-pages (orphan, metadata only)
         working-directory: gh-pages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,13 +137,13 @@ jobs:
           git config user.email "duynebot@users.noreply.github.com"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          # gh-pages now holds only repodata + landing files (KB-sized), so keep a
+          # single-commit orphan branch — no history bloat, no large-file pushes.
+          git checkout --orphan publish
           git add -A
-          if git diff --cached --quiet; then
-            echo "No repo changes to publish"
-          else
-            git commit -m "publish: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
-            git push origin gh-pages
-          fi
+          git commit -m "publish: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+          git branch -M publish gh-pages
+          git push -f origin gh-pages
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
@@ -133,7 +158,8 @@ jobs:
         run: |
           echo "Repo:       $BASE_URL"
           echo ".repo file: $BASE_URL/duynhlab.repo"
-          echo "RPMs:       $BASE_URL/rpm/el9/x86_64/"
+          echo "Metadata:   $BASE_URL/rpm/el9/x86_64/repodata/"
+          echo "RPMs:       https://github.com/${{ github.repository }}/releases/tag/v${{ steps.ver.outputs.version }}"
 
   deploy:
     name: Deploy gh-pages tree to GitHub Pages

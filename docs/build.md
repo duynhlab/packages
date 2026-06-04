@@ -40,7 +40,25 @@ All scripts live in [`scripts/`](../scripts) and source
 | `render-systemd.sh [outdir]` | `services.yaml` + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba specs/duynhlab.spec` |
-| `publish-yum-repo.sh` | `dist/*.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
+| `publish-yum-repo.sh` | `dist/*.x86_64.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
+
+> **Why no SRPMs are published**: `rpmbuild -ba` also emits a source RPM
+> (`dist/*.src.rpm`), but `publish-yum-repo.sh` only publishes the binary
+> `*.x86_64.rpm`. An SRPM is the *source bundle* (code + spec + patches) used to
+> `rpmbuild --rebuild` a binary — it is **not** installable and `dnf install`
+> never needs it. Reasons it is dropped:
+>
+> - **Not needed**: this is a binary-only YUM repo; clients only consume the
+>   `.x86_64.rpm`.
+> - **Redundant**: the real source lives in the upstream
+>   `duynhlab/<svc>-service` repos; the SRPM is just a fat copy of all eight
+>   services + frontend (~86 MB).
+> - **Breaks publishing**: at ~103 MB it exceeds GitHub's hard **100 MB
+>   per-file** limit, so pushing it to `gh-pages` is rejected
+>   (`pre-receive hook declined`).
+>
+> Keep SRPMs only if you ever distribute via Fedora/EPEL or must ship source for
+> compliance — neither applies here.
 | `smoke-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
 | `smoke-full.sh` | `dist/*.rpm` | — | Full systemd boot + health check (podman + Postgres) |
 
@@ -115,7 +133,8 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 flowchart LR
   PR[PR / push to main] --> B[build-rpms]
   B -->|success on main| P[publish-yum-repo]
-  P -->|createrepo_c| GH[(gh-pages)]
+  P -->|gh release upload| REL[(GitHub Release<br/>RPM asset)]
+  P -->|createrepo_c --location-prefix| GH[(gh-pages<br/>repodata only)]
   MAN1[workflow_dispatch] --> S[smoke-test-rpm]
   MAN2[workflow_dispatch] --> P
 ```
@@ -123,21 +142,43 @@ flowchart LR
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
 | **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main`, manual | fetch → build-local → render-systemd → **stage-all** → build-rpm → smoke-install → upload artefact |
-| **publish-yum-repo** | [`publish-yum-repo.yml`](../.github/workflows/publish-yum-repo.yml) | `workflow_run` after build-rpms on `main`, manual | rebuild RPM → `createrepo_c` → commit/push `gh-pages` |
+| **publish-yum-repo** | [`publish-yum-repo.yml`](../.github/workflows/publish-yum-repo.yml) | `workflow_run` after build-rpms on `main`, manual | rebuild RPM → **`gh release create v<VER>` + upload RPM** → `createrepo_c --location-prefix <release-url>` → force-push orphan `gh-pages` (repodata only) → `deploy-pages` |
 | **smoke-test-rpm** | [`smoke-test-rpm.yml`](../.github/workflows/smoke-test-rpm.yml) | manual, `workflow_call` | full systemd smoke in podman |
 
 > **Critical ordering**: `stage-all.sh` must run before `build-rpm.sh` — the
 > spec's `Source0` is the staging tarball. Every build workflow includes that
 > step.
 
-### Why gh-pages branch-push (not `deploy-pages` action)
+### Where the RPMs live: GitHub Releases, not gh-pages
 
-The YUM repo is an **append-only artefact store** that grows ~per release.
-`actions/upload-pages-artifact` caps at 1 GB and replaces the whole site each
-deploy, which breaks `createrepo_c --update` (it needs the previous repodata on
-disk). Branch-push keeps the repodata, gives a git audit trail, and can be
-force-reset to prune. If the tree ever exceeds ~1 GB, migrate to S3/R2 rather
-than the Pages artefact flow.
+The mega-RPM is ~70–80 MB and grows per release. Committing it to a git branch
+is a dead end: GitHub hard-rejects any file >100 MB (`pre-receive hook
+declined`) and accumulating 80 MB blobs across releases bloats history until the
+repo hits its size cap.
+
+So the RPM payload is hosted as a **GitHub Release asset** (2 GB per-file
+limit), and `gh-pages` carries **only the YUM metadata**:
+
+```
+GitHub Release  v<VER>/duynhlab-<VER>-1.el9.x86_64.rpm     (the actual package)
+gh-pages        rpm/el9/x86_64/repodata/*                  (KB of metadata)
+                duynhlab.repo, index.html, README.md
+```
+
+`createrepo_c --location-prefix
+https://github.com/duynhlab/packages/releases/download/v<VER>/` writes the
+metadata's `<location href>` as an **absolute URL** to the release asset, so
+`dnf` reads metadata from Pages and downloads the RPM straight from Releases.
+
+Because gh-pages is now KB-sized, it is force-pushed as a **single-commit orphan
+branch** each run — no large-file pushes, no history bloat. Release history (and
+rollback) is preserved on the Releases page itself, keyed by the `v<VER>` tag.
+
+`actions/deploy-pages` then publishes the gh-pages tree (it replaces the whole
+site each deploy, which is fine because the metadata is fully regenerated every
+run). Local `make publish-repo` runs without `RELEASE_BASE_URL`, falling back to
+the self-contained model (RPMs copied into the tree) so the repo is servable
+from `python3 -m http.server`.
 
 ## 6. Versioning
 

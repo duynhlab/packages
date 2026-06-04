@@ -27,6 +27,16 @@ ARCH_DIR="rpm/el9/x86_64"
 BASE_URL="${BASE_URL:-https://duynhlab.github.io/packages}"
 PAGES_HOST="${PAGES_HOST:-duynhlab.github.io}"
 
+# RELEASE_BASE_URL — when set, RPM payloads live as GitHub Release assets and
+# only the repodata is published to gh-pages. createrepo_c writes absolute
+# <location href> entries pointing at the release download URL, so the gh-pages
+# arch dir never holds an .rpm (avoids the 100 MB git file limit + history bloat).
+# Must end with a trailing slash, e.g.
+#   https://github.com/duynhlab/packages/releases/download/v2026.06.04/
+# When unset, the script falls back to the local model (RPMs copied into the
+# tree) so `make publish-repo` still produces a self-contained, servable repo.
+RELEASE_BASE_URL="${RELEASE_BASE_URL:-}"
+
 shopt -s nullglob
 rpms=( "$RPM_SRC"/*.x86_64.rpm "$RPM_SRC"/*.noarch.rpm )
 [[ ${#rpms[@]} -gt 0 ]] || die "No RPMs in $RPM_SRC — run scripts/build-rpm.sh first"
@@ -34,13 +44,24 @@ rpms=( "$RPM_SRC"/*.x86_64.rpm "$RPM_SRC"/*.noarch.rpm )
 log_info "RPM_SRC=$RPM_SRC  (${#rpms[@]} files)"
 log_info "REPO_OUT=$REPO_OUT"
 
+# createrepo_c always runs over a self-contained input dir holding the RPMs.
+# In release mode that's a scratch dir (RPMs discarded after metadata is built);
+# in local mode it's the published arch dir itself.
 mkdir -p "$REPO_OUT/$ARCH_DIR"
+if [[ -n "$RELEASE_BASE_URL" ]]; then
+  [[ "$RELEASE_BASE_URL" == */ ]] || RELEASE_BASE_URL="$RELEASE_BASE_URL/"
+  CR_INPUT="$BUILD_DIR/createrepo-input"
+  rm -rf "$CR_INPUT"; mkdir -p "$CR_INPUT"
+  log_info "RELEASE mode — RPMs served from $RELEASE_BASE_URL"
+else
+  CR_INPUT="$REPO_OUT/$ARCH_DIR"
+  log_info "LOCAL mode — RPMs copied into $CR_INPUT"
+fi
 
-# Copy fresh RPMs in (overwrite — same NVRA produces identical bits).
 for r in "${rpms[@]}"; do
-  cp -f "$r" "$REPO_OUT/$ARCH_DIR/"
+  cp -f "$r" "$CR_INPUT/"
 done
-log_ok "copied ${#rpms[@]} RPM(s) into $REPO_OUT/$ARCH_DIR"
+log_ok "staged ${#rpms[@]} RPM(s) into $CR_INPUT"
 
 # SRPMs are intentionally NOT published: the .src.rpm exceeds GitHub's 100 MB
 # per-file limit and is not needed for `dnf install` of a binary repo.
@@ -61,23 +82,30 @@ fi
 
 log_step "createrepo_c (runner=$runner)"
 
+# In release mode createrepo runs fresh on a scratch dir (no prior repodata),
+# so --update is a no-op there; in local mode --update reuses cached checksums.
+cr_args=( --update )
+[[ -n "$RELEASE_BASE_URL" ]] && cr_args=( --location-prefix "$RELEASE_BASE_URL" )
+
 run_host_createrepo() {
-  createrepo_c --update "$REPO_OUT/$ARCH_DIR"
+  createrepo_c "${cr_args[@]}" "$CR_INPUT"
 }
 
 run_container_createrepo() {
   local rt=$1 sel=""
   [[ "$rt" == "podman" ]] && sel=":Z"
   "$rt" run --rm \
-    -v "$REPO_OUT:/repo${sel}" \
-    -w /repo \
+    -v "$CR_INPUT:/cr_input${sel}" \
+    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+    -w / \
     rockylinux:9 \
     bash -c '
       set -e
       if ! command -v createrepo_c >/dev/null 2>&1; then
         dnf -y install --setopt=install_weak_deps=False createrepo_c >/dev/null
       fi
-      createrepo_c --update '"$ARCH_DIR"'
+      createrepo_c '"${cr_args[*]}"' /cr_input
+      chown -R "${HOST_UID}:${HOST_GID}" /cr_input/repodata 2>/dev/null || true
     '
 }
 
@@ -87,7 +115,25 @@ case "$runner" in
   *) die "Unknown CREATEREPO_RUNNER: $runner" ;;
 esac
 
+# In release mode, move only the freshly built repodata into the published tree
+# (replace any stale repodata; the arch dir must stay .rpm-free, so also purge
+# any leftover RPMs from an earlier accumulator-branch checkout).
+if [[ -n "$RELEASE_BASE_URL" ]]; then
+  rm -f "$REPO_OUT/$ARCH_DIR"/*.rpm
+  rm -rf "$REPO_OUT/$ARCH_DIR/repodata"
+  mkdir -p "$REPO_OUT/$ARCH_DIR"
+  cp -rf "$CR_INPUT/repodata" "$REPO_OUT/$ARCH_DIR/repodata"
+  rm -rf "$CR_INPUT"
+fi
+
 log_ok "repodata generated: $REPO_OUT/$ARCH_DIR/repodata/repomd.xml"
+
+# Link used on the landing page's "Browse" list.
+if [[ -n "$RELEASE_BASE_URL" ]]; then
+  RELEASE_LINK="$RELEASE_BASE_URL"
+else
+  RELEASE_LINK="rpm/el9/x86_64/"
+fi
 
 # ── Landing files (root of gh-pages) ──────────────────────────────────────────
 cat > "$REPO_OUT/duynhlab.repo" <<EOF
@@ -121,7 +167,8 @@ sudo systemctl enable --now duynhlab-platform.target</pre>
 
 <h2>Browse</h2>
 <ul>
-  <li><a href="rpm/el9/x86_64/">rpm/el9/x86_64/</a></li>
+  <li><a href="$RELEASE_LINK">RPM downloads (GitHub Releases)</a></li>
+  <li><a href="rpm/el9/x86_64/repodata/">rpm/el9/x86_64/repodata/</a> (metadata)</li>
   <li><a href="duynhlab.repo">duynhlab.repo</a></li>
 </ul>
 EOF
