@@ -115,7 +115,7 @@ jobs:
           else
             gh release create "$tag" "$rpm" \
               --repo "${{ github.repository }}" \
-              --title "duynhlab ${VERSION}" \
+              --title "packages ${VERSION}" \
               --notes "Mega-RPM for the duynhlab platform (EL9). Install via the YUM repo: https://duynhlab.github.io/packages"
           fi
 
