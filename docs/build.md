@@ -40,7 +40,25 @@ All scripts live in [`scripts/`](../scripts) and source
 | `render-systemd.sh [outdir]` | `services.yaml` + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba specs/duynhlab.spec` |
-| `publish-yum-repo.sh` | `dist/*.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
+| `publish-yum-repo.sh` | `dist/*.x86_64.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
+
+> **Why no SRPMs are published**: `rpmbuild -ba` also emits a source RPM
+> (`dist/*.src.rpm`), but `publish-yum-repo.sh` only publishes the binary
+> `*.x86_64.rpm`. An SRPM is the *source bundle* (code + spec + patches) used to
+> `rpmbuild --rebuild` a binary — it is **not** installable and `dnf install`
+> never needs it. Reasons it is dropped:
+>
+> - **Not needed**: this is a binary-only YUM repo; clients only consume the
+>   `.x86_64.rpm`.
+> - **Redundant**: the real source lives in the upstream
+>   `duynhlab/<svc>-service` repos; the SRPM is just a fat copy of all eight
+>   services + frontend (~86 MB).
+> - **Breaks publishing**: at ~103 MB it exceeds GitHub's hard **100 MB
+>   per-file** limit, so pushing it to `gh-pages` is rejected
+>   (`pre-receive hook declined`).
+>
+> Keep SRPMs only if you ever distribute via Fedora/EPEL or must ship source for
+> compliance — neither applies here.
 | `smoke-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
 | `smoke-full.sh` | `dist/*.rpm` | — | Full systemd boot + health check (podman + Postgres) |
 
