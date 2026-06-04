@@ -74,7 +74,59 @@ flowchart LR
   REPO -->|dnf install| HOST[Target EL9 host]
 ```
 
-## Repository layout
+## CI workflows
+
+Two GitHub Actions workflows split the pipeline into **validate** and **publish**.
+
+```mermaid
+flowchart LR
+  PR[Pull request] --> B
+  PUSH[Push to main] --> B
+  B[build-rpms<br/>build.yml] -->|on success<br/>workflow_run| P[publish-yum-repo<br/>publish-yum-repo.yml]
+  P --> PAGES[gh-pages YUM repo]
+```
+
+| Workflow | File | Triggers | What it does |
+|---|---|---|---|
+| `build-rpms` | [`build.yml`](.github/workflows/build.yml) | PR + push to `main`, `workflow_dispatch` | Build & smoke-test the mega-RPM |
+| `publish-yum-repo` | [`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml) | After `build-rpms` succeeds on `main` (`workflow_run`), `workflow_dispatch` | Rebuild and publish the YUM repo to `gh-pages` |
+
+### `build-rpms` — validate on every change
+
+Runs on every PR and every push to `main`. It proves a change still produces an
+installable package **before** anything is published. Steps:
+
+1. Fetch every service source (`fetch-sources.sh`).
+2. Build all 8 backends + frontend (`build-local.sh` per service from `services.yaml`).
+3. Render systemd units (`render-systemd.sh`) and stage the Source0 tarball (`stage-all.sh`).
+4. Build the mega-RPM with `rpmbuild` in a Rocky 9 container (`build-rpm.sh`).
+5. **Smoke-install** the RPM inside Rocky 9 (`smoke-install.sh`) to catch scriptlet/dependency errors.
+6. Upload the RPM as a build artefact (kept 14 days).
+
+**Why it's needed:** it is the gate. It has `contents: read` only — it never
+publishes. A red `build-rpms` blocks the PR and prevents a broken RPM from ever
+reaching users.
+
+### `publish-yum-repo` — publish after a green build
+
+Triggered by `workflow_run` only when `build-rpms` finished **successfully on
+`main`** (so PRs never publish), or manually via `workflow_dispatch`. Steps:
+
+1. Check out `main` and the `gh-pages` branch (creating `gh-pages` if absent).
+2. Rebuild the mega-RPM (same pipeline as `build-rpms`).
+3. `publish-yum-repo.sh` runs `createrepo_c` to **incrementally update** the YUM
+   metadata into the `gh-pages` working tree.
+4. Commit and push `gh-pages`; GitHub Pages then serves
+   `https://duynhlab.github.io/packages`.
+
+**Why it's needed:** publishing is separated from validation so it only happens
+on trusted, merged code. It needs `contents: write` (push to `gh-pages`) and
+`pages: write`. The `[skip ci]` commit message and the success-on-`main`
+condition prevent an infinite build↔publish loop. Pushing a branch (rather than
+using the Pages artefact upload) is what lets `createrepo_c --update` keep older
+RPMs and only add new metadata.
+
+
 
 ```
 packages/
