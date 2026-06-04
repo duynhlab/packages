@@ -89,7 +89,7 @@ flowchart LR
 | Workflow | File | Triggers | What it does |
 |---|---|---|---|
 | `build-rpms` | [`build.yml`](.github/workflows/build.yml) | PR + push to `main`, `workflow_dispatch` | Build & smoke-test the mega-RPM |
-| `publish-yum-repo` | [`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml) | After `build-rpms` succeeds on `main` (`workflow_run`), `workflow_dispatch` | Rebuild and publish the YUM repo to `gh-pages` |
+| `publish-yum-repo` | [`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml) | After `build-rpms` succeeds on `main` (`workflow_run`), `workflow_dispatch` | Accumulate the YUM repo on `gh-pages`, then deploy it via `actions/deploy-pages` |
 
 ### `build-rpms` — validate on every change
 
@@ -112,19 +112,26 @@ reaching users.
 Triggered by `workflow_run` only when `build-rpms` finished **successfully on
 `main`** (so PRs never publish), or manually via `workflow_dispatch`. Steps:
 
-1. Check out `main` and the `gh-pages` branch (creating `gh-pages` if absent).
+1. Check out `main` and the persistent `gh-pages` branch.
 2. Rebuild the mega-RPM (same pipeline as `build-rpms`).
 3. `publish-yum-repo.sh` runs `createrepo_c` to **incrementally update** the YUM
-   metadata into the `gh-pages` working tree.
-4. Commit and push `gh-pages`; GitHub Pages then serves
+   metadata into the `gh-pages` working tree (old RPMs + new RPM).
+4. Commit and push `gh-pages` — the **durable accumulator** that retains every
+   previously published RPM.
+5. Upload that tree as a Pages artifact and deploy it with
+   `actions/deploy-pages`; GitHub then serves
    `https://duynhlab.github.io/packages`.
 
-**Why it's needed:** publishing is separated from validation so it only happens
-on trusted, merged code. It needs `contents: write` (push to `gh-pages`) and
-`pages: write`. The `[skip ci]` commit message and the success-on-`main`
-condition prevent an infinite build↔publish loop. Pushing a branch (rather than
-using the Pages artefact upload) is what lets `createrepo_c --update` keep older
-RPMs and only add new metadata.
+**Why both a branch and the Pages artifact?** GitHub's artifact-based Pages
+deploy (`deploy-pages`) **fully replaces** the site on every run — it has no
+incremental mode. A YUM repo is incremental: `createrepo_c --update` must see
+the previously published RPMs to re-index them. So the `gh-pages` branch is the
+source of truth that *accumulates* RPMs across runs, and each deploy simply
+serves the full current tree from that branch. Validation is also separated
+from publishing (only merged `main` publishes); the `[skip ci]` commit message
+and the success-on-`main` condition prevent an infinite build↔publish loop. The
+job needs `contents: write` (push `gh-pages`), `pages: write`, and `id-token:
+write` (deploy).
 
 
 
