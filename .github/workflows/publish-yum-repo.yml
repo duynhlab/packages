@@ -58,7 +58,7 @@ jobs:
             git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
             : > .nojekyll
             git add .nojekyll
-            git -c user.email=ops@duynhlab.io -c user.name="duynhlab-ops" \
+            git -c user.email=duynebot@users.noreply.github.com -c user.name="duynebot" \
               commit -m "Initial gh-pages branch"
           fi
 
@@ -122,8 +122,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          git config user.email "ops@duynhlab.io"
-          git config user.name  "duynhlab-ops"
+          git config user.name  "duynebot"
+          git config user.email "duynebot@users.noreply.github.com"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           # The repo may be on the runner's default branch (master) when gh-pages
