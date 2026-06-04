@@ -42,13 +42,8 @@ for r in "${rpms[@]}"; do
 done
 log_ok "copied ${#rpms[@]} RPM(s) into $REPO_OUT/$ARCH_DIR"
 
-# Optional SRPMs.
-srpms=( "$RPM_SRC"/*.src.rpm )
-if [[ ${#srpms[@]} -gt 0 ]]; then
-  mkdir -p "$REPO_OUT/rpm/el9/SRPMS"
-  cp -f "${srpms[@]}" "$REPO_OUT/rpm/el9/SRPMS/"
-  log_ok "copied ${#srpms[@]} SRPM(s)"
-fi
+# SRPMs are intentionally NOT published: the .src.rpm exceeds GitHub's 100 MB
+# per-file limit and is not needed for `dnf install` of a binary repo.
 
 # ── createrepo_c ──────────────────────────────────────────────────────────────
 runner="${CREATEREPO_RUNNER:-}"
@@ -68,9 +63,6 @@ log_step "createrepo_c (runner=$runner)"
 
 run_host_createrepo() {
   createrepo_c --update "$REPO_OUT/$ARCH_DIR"
-  if [[ ${#srpms[@]} -gt 0 ]]; then
-    createrepo_c --update "$REPO_OUT/rpm/el9/SRPMS"
-  fi
 }
 
 run_container_createrepo() {
@@ -86,9 +78,6 @@ run_container_createrepo() {
         dnf -y install --setopt=install_weak_deps=False createrepo_c >/dev/null
       fi
       createrepo_c --update '"$ARCH_DIR"'
-      if [ -d rpm/el9/SRPMS ] && ls rpm/el9/SRPMS/*.src.rpm >/dev/null 2>&1; then
-        createrepo_c --update rpm/el9/SRPMS
-      fi
     '
 }
 
@@ -133,7 +122,6 @@ sudo systemctl enable --now duynhlab-platform.target</pre>
 <h2>Browse</h2>
 <ul>
   <li><a href="rpm/el9/x86_64/">rpm/el9/x86_64/</a></li>
-  <li><a href="rpm/el9/SRPMS/">rpm/el9/SRPMS/</a></li>
   <li><a href="duynhlab.repo">duynhlab.repo</a></li>
 </ul>
 EOF
