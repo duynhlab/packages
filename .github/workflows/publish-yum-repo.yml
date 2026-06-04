@@ -41,26 +41,12 @@ jobs:
         with:
           path: packages
 
-      - name: Checkout gh-pages (will be created if missing)
+      - name: Checkout gh-pages
         uses: actions/checkout@v6
         with:
           ref: gh-pages
           path: gh-pages
           fetch-depth: 1
-        continue-on-error: true
-
-      - name: Initialise gh-pages branch if absent
-        run: |
-          if [ ! -d gh-pages/.git ]; then
-            mkdir -p gh-pages
-            cd gh-pages
-            git init -b gh-pages
-            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-            : > .nojekyll
-            git add .nojekyll
-            git -c user.email=duynebot@users.noreply.github.com -c user.name="duynebot" \
-              commit -m "Initial gh-pages branch"
-          fi
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -116,7 +102,7 @@ jobs:
           BASE_URL: ${{ env.BASE_URL }}
         run: ./scripts/publish-yum-repo.sh
 
-      - name: Commit + push gh-pages
+      - name: Commit + push gh-pages (durable accumulator)
         working-directory: gh-pages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -126,20 +112,38 @@ jobs:
           git config user.email "duynebot@users.noreply.github.com"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          # The repo may be on the runner's default branch (master) when gh-pages
-          # was freshly initialised. Force the working branch to gh-pages so the
-          # push refspec resolves in both the fresh-init and existing-branch cases.
-          git branch -M gh-pages
           git add -A
           if git diff --cached --quiet; then
             echo "No repo changes to publish"
-            exit 0
+          else
+            git commit -m "publish: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push origin gh-pages
           fi
-          git commit -m "publish: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
-          git push origin gh-pages
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: gh-pages
+          include-hidden-files: true
 
       - name: Print final URLs
         run: |
           echo "Repo:       $BASE_URL"
           echo ".repo file: $BASE_URL/duynhlab.repo"
           echo "RPMs:       $BASE_URL/rpm/el9/x86_64/"
+
+  deploy:
+    name: Deploy gh-pages tree to GitHub Pages
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
