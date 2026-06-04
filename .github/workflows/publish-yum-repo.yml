@@ -126,6 +126,10 @@ jobs:
           git config user.name  "duynhlab-ops"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          # The repo may be on the runner's default branch (master) when gh-pages
+          # was freshly initialised. Force the working branch to gh-pages so the
+          # push refspec resolves in both the fresh-init and existing-branch cases.
+          git branch -M gh-pages
           git add -A
           if git diff --cached --quiet; then
             echo "No repo changes to publish"
