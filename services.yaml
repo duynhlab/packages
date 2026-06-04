@@ -116,8 +116,8 @@ services:
       app_user: duynhlab_notification_app
       migrator_user: duynhlab_notification_migrator
     dependencies:
-      after: [redis.service]
-      env_files: [/etc/duynhlab/common/redis.properties]
+      after: [valkey.service]
+      env_files: [/etc/duynhlab/common/valkey.properties]
 
   - name: shipping
     repo: duynhlab/shipping-service
