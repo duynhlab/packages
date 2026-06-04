@@ -99,8 +99,14 @@ jobs:
         working-directory: packages
         run: ./scripts/render-systemd.sh
 
+      - name: Stage Source0 tarball
+        working-directory: packages
+        run: ./scripts/stage-all.sh
+
       - name: Build mega-RPM
         working-directory: packages
+        env:
+          BUILD_RUNNER: docker
         run: ./scripts/build-rpm.sh
 
       - name: Stage YUM repo into gh-pages tree
