@@ -41,26 +41,12 @@ jobs:
         with:
           path: packages
 
-      - name: Checkout gh-pages (will be created if missing)
+      - name: Checkout gh-pages
         uses: actions/checkout@v6
         with:
           ref: gh-pages
           path: gh-pages
           fetch-depth: 1
-        continue-on-error: true
-
-      - name: Initialise gh-pages branch if absent
-        run: |
-          if [ ! -d gh-pages/.git ]; then
-            mkdir -p gh-pages
-            cd gh-pages
-            git init -b gh-pages
-            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-            : > .nojekyll
-            git add .nojekyll
-            git -c user.email=duynebot@users.noreply.github.com -c user.name="duynebot" \
-              commit -m "Initial gh-pages branch"
-          fi
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -126,10 +112,6 @@ jobs:
           git config user.email "duynebot@users.noreply.github.com"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          # The repo may be on the runner's default branch (master) when gh-pages
-          # was freshly initialised. Force the working branch to gh-pages so the
-          # push refspec resolves in both the fresh-init and existing-branch cases.
-          git branch -M gh-pages
           git add -A
           if git diff --cached --quiet; then
             echo "No repo changes to publish"
