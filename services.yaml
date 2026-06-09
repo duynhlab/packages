@@ -8,10 +8,25 @@
 #   src_dir       directory under $DUYNHLAB_SRC_ROOT (defaults to basename of repo)
 #   binary        output binary name (defaults to name + "-service")
 #   build_path    Go package main path (default ./cmd)
-#   port          listen port (used by duynhlab-ctl health)
+#   port          HTTP listen port. INJECTED as PORT= into <svc>.env. Every service
+#                 defaults to 8080 in code, so on a shared host this override is
+#                 MANDATORY to avoid collision (also used by duynhlab-ctl health).
+#   grpc_port     gRPC listen port. INJECTED as GRPC_PORT= into <svc>.env. Only set
+#                 for services that run a gRPC server (default 9090 in code →
+#                 collides on a shared host). Omit for HTTP-only services.
 #   type          backend | static
 #   database      {name, app_user, migrator_user} — omit if no DB
 #   dependencies  {after: [...], env_files: [...]} — extra systemd After= / EnvironmentFile=
+#
+# Migrations: each backend EMBEDS its own SQL (go:embed) and runs them via its own
+# `<binary> migrate` subcommand (golang-migrate v4 through duynhlab/pkg/migratex,
+# forward-only *.up.sql). The packages repo does NOT ship loose SQL or a separate
+# migrate binary — see plan.md D23/D24. `duynhlab-db-setup <svc> migrate` just execs
+# `<binary> migrate` with the migrator DB_USER/DB_PASSWORD in the environment.
+#
+# DB env vars read by every backend (no DATABASE_URL): DB_HOST, DB_PORT (5432),
+# DB_NAME, DB_USER, DB_PASSWORD, DB_SSLMODE (disable), DB_POOL_MAX_CONNECTIONS (25),
+# DB_POOL_MODE, DB_POOLER_TYPE. Migrations MUST hit the direct DB host, never a pooler.
 
 services:
   - name: auth
@@ -20,6 +35,7 @@ services:
     binary: auth-service
     build_path: ./cmd
     port: 8001
+    grpc_port: 9001        # auth runs a gRPC server (9090 default in code)
     type: backend
     database:
       name: duynhlab_auth
@@ -95,6 +111,7 @@ services:
     binary: review-service
     build_path: ./cmd
     port: 8006
+    grpc_port: 9006        # review runs a gRPC server (9090 default in code)
     type: backend
     database:
       name: duynhlab_review
@@ -110,14 +127,18 @@ services:
     binary: notification-service
     build_path: ./cmd
     port: 8007
+    grpc_port: 9007        # notification runs a gRPC server (9090 default in code)
     type: backend
     database:
       name: duynhlab_notification
       app_user: duynhlab_notification_app
       migrator_user: duynhlab_notification_migrator
     dependencies:
-      after: [valkey.service]
-      env_files: [/etc/duynhlab/common/valkey.properties]
+      # notification-service is PostgreSQL-only — NO Redis/Valkey (verified 2026-06-09,
+      # grep of repo found none). It calls auth over gRPC (AUTH_GRPC_ADDR), ordered by
+      # the platform target, so no extra After= is needed here.
+      after: []
+      env_files: []
 
   - name: shipping
     repo: duynhlab/shipping-service
@@ -125,6 +146,7 @@ services:
     binary: shipping-service
     build_path: ./cmd
     port: 8008
+    grpc_port: 9008        # shipping runs a gRPC server (9090 default in code)
     type: backend
     database:
       name: duynhlab_shipping
@@ -139,8 +161,18 @@ services:
     src_dir: frontend
     binary: ""
     build_path: ""
-    port: 3000
+    port: 8080            # nginx vhost listen port on the host (frontend's own
+                          # container listens on 80; we render our own vhost)
     type: static
+    build:
+      # Vite 8 + React 19 SPA, Node 24. API base URL is baked into the bundle at
+      # BUILD time — it cannot be changed at runtime. Rebuild to repoint the gateway.
+      cmd: "npm ci && npm run build"
+      output_dir: dist
+      web_root: /var/www/duynhlab-frontend
+      env:
+        VITE_API_BASE_URL: "https://gateway.duynh.me"   # build-time only
+        VITE_USE_MOCK: "false"
     dependencies:
       after: [nginx.service]
       env_files: []

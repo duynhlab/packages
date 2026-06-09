@@ -2,6 +2,7 @@
 # Override per-host values in review.override (also auto-loaded by systemd unit).
 SERVICE_NAME=review
 PORT=8006
+GRPC_PORT=9006
 
 DB_HOST=localhost
 DB_PORT=5432

@@ -37,15 +37,17 @@ Operates **per service**. Reads connection settings from
 `/etc/duynhlab/<svc>.env`.
 
 ```
-duynhlab-db-setup <bootstrap|migrate|status|rollback> <svc> [args]
+duynhlab-db-setup <bootstrap|migrate|status> <svc>
 ```
 
 | Subcommand | Needs | Description |
 |---|---|---|
 | `bootstrap <svc>` | `SUPERUSER_DSN` | Create database + `app`/`migrator` roles + grants |
-| `migrate <svc>` | — | Apply pending migrations as the migrator role |
-| `status <svc>` | — | Installed schema version vs shipped `SCHEMA_VERSION` |
-| `rollback <svc> <N>` | — | Roll back N migration steps (confirm prompt) |
+| `migrate <svc>` | — | Apply pending migrations by exec'ing the service binary's own `migrate` subcommand (embedded golang-migrate) as the migrator role |
+| `status <svc>` | — | Installed `schema_migrations` version (+ dirty flag) vs shipped `SCHEMA_VERSION` |
+
+> Migrations are **forward-only** and embedded in each service binary — there is no
+> `rollback`. Roll forward with a new migration in the service repo.
 
 > There is **no `all`** target — bootstrap/migrate each service explicitly, or
 > loop in the shell.

@@ -2,6 +2,7 @@
 # Override per-host values in notification.override (also auto-loaded by systemd unit).
 SERVICE_NAME=notification
 PORT=8007
+GRPC_PORT=9007
 
 DB_HOST=localhost
 DB_PORT=5432

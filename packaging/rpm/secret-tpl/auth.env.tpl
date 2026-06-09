@@ -2,6 +2,7 @@
 # Override per-host values in auth.override (also auto-loaded by systemd unit).
 SERVICE_NAME=auth
 PORT=8001
+GRPC_PORT=9001
 
 DB_HOST=localhost
 DB_PORT=5432

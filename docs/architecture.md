@@ -42,7 +42,7 @@ flowchart TB
 |---|---|---|
 | Backend services | 8 | Static Go binaries (`CGO_ENABLED=0`), one per `services.yaml` entry of `type: backend` |
 | Frontend | 1 | `type: static`, npm build output served by nginx |
-| CLI tools | 5 | `duynhlab-ctl`, `duynhlab-db-setup`, `duynhlab-db-migrate`, `duynhlab-gen-env`, `duynhlab-gen-password` |
+| CLI tools | 4 | `duynhlab-ctl`, `duynhlab-db-setup`, `duynhlab-gen-env`, `duynhlab-gen-password` |
 | systemd units | 8 + 2 targets | per-service `.service` + `duynhlab-platform.target` + `duynhlab-infra.target` |
 
 ### Services (from `services.yaml`)
@@ -67,10 +67,9 @@ flowchart TB
 ```
 /opt/duynhlab/                      Immutable payload (owned by package)
 ├── <svc>/
-│   ├── bin/<svc>-service           Backend binary
-│   ├── migrations/sql/             golang-migrate SQL files
+│   ├── bin/<svc>-service           Backend binary (migrations embedded via go:embed)
 │   ├── BINARY_VERSION
-│   └── SCHEMA_VERSION              Schema the binary expects
+│   └── SCHEMA_VERSION              Max embedded migration version (audit-only)
 ├── frontend/dist/                  Static SPA
 ├── lib/                            CLI tools + init-service.sh + password-generator.sh
 ├── nginx/ valkey/ postgresql/      Config templates (copied into /etc on install)
@@ -193,9 +192,9 @@ flowchart LR
 ```
 
 - `bootstrap` (needs `SUPERUSER_DSN`) creates the database + both roles + grants.
-- `migrate` applies `golang-migrate` files from
-  `/opt/duynhlab/<svc>/migrations/sql/` as the migrator role.
-- A backend refuses to start if the applied schema is older than its shipped
-  `SCHEMA_VERSION`.
+- `migrate` execs the service binary's own `migrate` subcommand
+  (`<binary> migrate`, golang-migrate embedded via `go:embed`) as the migrator
+  role against the direct DB host. Forward-only; no separate migrate tool, no
+  loose SQL.
 
 See [operations.md](operations.md) for the commands.
