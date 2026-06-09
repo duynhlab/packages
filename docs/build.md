@@ -100,7 +100,6 @@ Environment knobs:
 | `VERSION` | `$(date -u +%Y.%m.%d)` | RPM version (CalVer) |
 | `DUYNHLAB_SRC_ROOT` | `..` (sibling dir) | Where service repos are cloned |
 | `BUILD_RUNNER` | auto | `host`/`podman`/`docker` for rpmbuild |
-| `SKIP_MIGRATE_DOWNLOAD` | unset | Skip golang-migrate fetch during stage |
 
 ## 4. Local build walkthrough
 

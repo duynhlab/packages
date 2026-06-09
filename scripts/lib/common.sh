@@ -64,6 +64,15 @@ svc_field_list() {
   "$(yq_bin)" ".services[] | select(.name==\"$name\") | .${field}[]?" "$SERVICES_YAML"
 }
 
+# svc_build_env <name> — print KEY=VALUE lines from .build.env (static services).
+#   Used to bake Vite build-time vars (e.g. VITE_API_BASE_URL) before `npm run build`.
+svc_build_env() {
+  local name=$1
+  "$(yq_bin)" -r \
+    ".services[] | select(.name==\"$name\") | .build.env // {} | to_entries | .[] | .key + \"=\" + .value" \
+    "$SERVICES_YAML"
+}
+
 svc_exists() {
   local name=$1
   svc_list | grep -qx "$name"

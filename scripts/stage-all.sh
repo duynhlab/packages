@@ -2,7 +2,8 @@
 # scripts/stage-all.sh — produce the Source0 tarball for the mega-RPM.
 #
 # Layout produced at $BUILD_DIR/staging/:
-#   opt/duynhlab/<svc>/{bin,migrations/sql,BINARY_VERSION,SCHEMA_VERSION}
+#   opt/duynhlab/<svc>/{bin,BINARY_VERSION,SCHEMA_VERSION}
+#   (migrations are embedded in the service binary — no loose SQL is staged; D24)
 #   opt/duynhlab/frontend/dist/...
 #   opt/duynhlab/etc/{services.yaml, env-global.properties}
 #   opt/duynhlab/{nginx,valkey,postgresql,secret-tpl,logrotate}/...
@@ -39,29 +40,24 @@ extract_backend() {
   local svc=$1 raw_dir="$BUILD_DIR/$svc/raw"
   [[ -d "$raw_dir" ]] || die "Missing build/$svc/raw — run scripts/build-local.sh"
 
-  local bin_tgz mig_tgz info
+  local bin_tgz info
   bin_tgz=$(ls "$raw_dir"/*-linux-amd64.tar.gz 2>/dev/null | head -1)
-  mig_tgz=$(ls "$raw_dir"/*-migrations.tar.gz   2>/dev/null | head -1)
   info="$raw_dir/build-info.env"
 
   [[ -f "$bin_tgz" ]] || die "Missing binary tarball for $svc in $raw_dir"
   [[ -f "$info"    ]] || die "Missing build-info.env for $svc"
 
   local dst="$OPT/$svc"
-  mkdir -p "$dst/bin" "$dst/migrations"
+  mkdir -p "$dst/bin"
   tar -xzf "$bin_tgz" --strip-components=1 -C "$dst"
-  if [[ -n "$mig_tgz" && -f "$mig_tgz" ]]; then
-    tar -xzf "$mig_tgz" -C "$dst/migrations"
-  fi
 
+  # SCHEMA_VERSION (audit-only): highest embedded migration, recorded by
+  # build-local.sh into build-info.env. Migrations themselves ship inside the
+  # binary (//go:embed) — none are staged here.
   # shellcheck disable=SC1090
   . "$info"
-  printf '%s\n' "${VERSION:-unknown}"        > "$dst/BINARY_VERSION"
-  local schema=1
-  if [[ -d "$dst/migrations/sql" ]]; then
-    schema=$(ls "$dst/migrations/sql"/*.sql 2>/dev/null | wc -l)
-  fi
-  printf '%s\n' "$schema" > "$dst/SCHEMA_VERSION"
+  printf '%s\n' "${VERSION:-unknown}"   > "$dst/BINARY_VERSION"
+  printf '%s\n' "${SCHEMA_VERSION:-1}"  > "$dst/SCHEMA_VERSION"
 
   chmod 0755 "$dst/bin"/* 2>/dev/null || :
   log_ok "staged $svc ($(basename "$bin_tgz"))"
@@ -94,35 +90,7 @@ install -m 0755 "$REPO_ROOT/packaging/rpm/lib/init-service.sh"               "$O
 install -m 0755 "$REPO_ROOT/packaging/rpm/lib/password-generator.sh"         "$OPT/lib/"
 log_ok "staged CLI + lib"
 
-# ── 4. golang-migrate binary as duynhlab-db-migrate ───────────────────────────
-MIGRATE_BIN="$OPT/lib/duynhlab-db-migrate"
-if [[ ! -x "$MIGRATE_BIN" ]]; then
-  if [[ -n "${SKIP_MIGRATE_DOWNLOAD:-}" ]]; then
-    log_warn "SKIP_MIGRATE_DOWNLOAD set — installing stub for duynhlab-db-migrate"
-    cat > "$MIGRATE_BIN" <<'EOF'
-#!/usr/bin/env bash
-echo "duynhlab-db-migrate stub — real binary not installed" >&2
-exit 1
-EOF
-    chmod 0755 "$MIGRATE_BIN"
-  else
-    MIGRATE_VER="${MIGRATE_VER:-v4.17.0}"
-    URL="https://github.com/golang-migrate/migrate/releases/download/${MIGRATE_VER}/migrate.linux-amd64.tar.gz"
-    log_info "downloading golang-migrate $MIGRATE_VER"
-    tmp=$(mktemp -d)
-    if command -v curl >/dev/null; then
-      curl -fsSL -o "$tmp/m.tgz" "$URL"
-    else
-      die "curl required to download golang-migrate (or set SKIP_MIGRATE_DOWNLOAD=1)"
-    fi
-    tar -xzf "$tmp/m.tgz" -C "$tmp"
-    install -m 0755 "$tmp/migrate" "$MIGRATE_BIN"
-    rm -rf "$tmp"
-    log_ok "installed duynhlab-db-migrate ($MIGRATE_VER)"
-  fi
-fi
-
-# ── 5. Config templates ───────────────────────────────────────────────────────
+# ── 4. Config templates ───────────────────────────────────────────────────────
 cp -a "$REPO_ROOT/packaging/rpm/nginx/."      "$OPT/nginx/"
 cp -a "$REPO_ROOT/packaging/rpm/valkey/."     "$OPT/valkey/"
 cp -a "$REPO_ROOT/packaging/rpm/postgresql/." "$OPT/postgresql/"
@@ -130,7 +98,7 @@ cp -a "$REPO_ROOT/packaging/rpm/secret-tpl/." "$OPT/secret-tpl/"
 cp -a "$REPO_ROOT/packaging/rpm/logrotate/."  "$OPT/logrotate/"
 log_ok "staged config templates"
 
-# ── 6. services.yaml + env-global.properties ──────────────────────────────────
+# ── 5. services.yaml + env-global.properties ──────────────────────────────────
 install -m 0644 "$REPO_ROOT/services.yaml" "$OPT/etc/services.yaml"
 
 cat > "$OPT/etc/env-global.properties" <<EOF
@@ -147,10 +115,10 @@ REDIS_PORT=6379
 EOF
 log_ok "staged etc/services.yaml + env-global.properties"
 
-# ── 7. systemd units ──────────────────────────────────────────────────────────
+# ── 6. systemd units ──────────────────────────────────────────────────────────
 bash "$SCRIPT_DIR/render-systemd.sh" "$SYSD" >/dev/null
 
-# ── 8. Tarball ────────────────────────────────────────────────────────────────
+# ── 7. Tarball ────────────────────────────────────────────────────────────────
 log_step "creating $TARBALL"
 tar -C "$STAGE" -czf "$TARBALL" opt systemd
 log_ok "staged tarball: $TARBALL ($(du -h "$TARBALL" | cut -f1))"

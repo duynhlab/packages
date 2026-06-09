@@ -2,6 +2,7 @@
 # Override per-host values in shipping.override (also auto-loaded by systemd unit).
 SERVICE_NAME=shipping
 PORT=8008
+GRPC_PORT=9008
 
 DB_HOST=localhost
 DB_PORT=5432

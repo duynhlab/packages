@@ -54,15 +54,16 @@ duynhlab e-commerce platform — single mega-RPM containing:
   * 8 Go backend services (auth, user, product, cart, order, review,
     notification, shipping) under /opt/duynhlab/<svc>/bin/
   * Frontend SPA (static dist) under /opt/duynhlab/frontend/dist/
-  * CLI tools: duynhlab-ctl, duynhlab-db-setup, duynhlab-db-migrate,
-    duynhlab-gen-env, duynhlab-gen-password
+  * CLI tools: duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env,
+    duynhlab-gen-password
   * Per-service systemd units + duynhlab-platform.target + duynhlab-infra.target
   * Template configs for nginx, valkey, postgresql, logrotate
   * Idempotent init-service.sh that drops configs into /etc/ on first install
   * Random password generation on first install (preserved on upgrade)
 
 Install:  dnf install duynhlab
-Bootstrap: duynhlab-db-setup bootstrap && duynhlab-db-setup migrate
+Bootstrap: duynhlab-db-setup bootstrap <svc> && duynhlab-db-setup migrate <svc>
+           (migrate runs the service binary's own embedded migrations)
 Start:    systemctl enable --now duynhlab-platform.target
 
 %prep
@@ -86,7 +87,7 @@ cp -a opt/duynhlab/. %{buildroot}%{duynhlab_prefix}/
 cp -a systemd/. %{buildroot}%{_unitdir}/
 
 # 3. /usr/bin symlinks to /opt/duynhlab/lib/* CLI tools
-for tool in duynhlab-ctl duynhlab-db-setup duynhlab-db-migrate \
+for tool in duynhlab-ctl duynhlab-db-setup \
             duynhlab-gen-env duynhlab-gen-password; do
   ln -sf %{duynhlab_prefix}/lib/$tool %{buildroot}%{_bindir}/$tool
 done
@@ -162,14 +163,15 @@ cat <<'EOF'
 ================================================================
   duynhlab installed.
 
-  Next steps (as root):
+  Next steps (as root), per backend service (auth user product cart
+  order review notification shipping):
 
-    # 1. Bootstrap PostgreSQL (one-time):
+    # 1. Bootstrap PostgreSQL (one-time, per service):
     SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \
-      duynhlab-db-setup bootstrap
+      duynhlab-db-setup bootstrap auth
 
-    # 2. Run migrations:
-    duynhlab-db-setup migrate
+    # 2. Run migrations (runs the service binary's embedded migrations):
+    duynhlab-db-setup migrate auth
 
     # 3. Start platform:
     systemctl enable --now duynhlab-platform.target
@@ -231,7 +233,6 @@ exit 0
 # /usr/bin symlinks
 %{_bindir}/duynhlab-ctl
 %{_bindir}/duynhlab-db-setup
-%{_bindir}/duynhlab-db-migrate
 %{_bindir}/duynhlab-gen-env
 %{_bindir}/duynhlab-gen-password
 

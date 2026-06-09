@@ -21,7 +21,14 @@
 #
 # Env knobs:
 #   POSTGRES_IMAGE      docker.io/postgres:16-alpine
-#   APP_IMAGE           quay.io/centos/centos:stream9
+#   APP_IMAGE           systemd-capable EL9 image (must contain /sbin/init).
+#                       The default centos:stream9 is MINIMAL and has NO systemd —
+#                       build one first, e.g.:
+#                         podman build -t localhost/duynhlab-smoke-init - <<'D'
+#                         FROM quay.io/centos/centos:stream9
+#                         RUN dnf -y install systemd && dnf clean all
+#                         D
+#                       then run with APP_IMAGE=localhost/duynhlab-smoke-init
 #   POSTGRES_PASSWORD   randomly generated if unset
 #   POD_NAME            duynhlab-smoke
 #   KEEP_POD=1          don't tear down on exit (debug)
@@ -124,7 +131,8 @@ exec_app '
   set -e
   dnf -y install epel-release >/dev/null
   dnf -y module enable postgresql:16 >/dev/null
-  dnf -y install nginx valkey postgresql shadow-utils which file curl >/dev/null
+  # --allowerasing: some base images ship curl-minimal which conflicts with curl.
+  dnf -y --allowerasing install nginx valkey postgresql shadow-utils which file curl >/dev/null
   dnf -y localinstall /srv/dist/duynhlab-*.x86_64.rpm
 '
 log_ok "RPM installed"
@@ -136,7 +144,7 @@ exec_app '
   cat > /etc/duynhlab/env-global.properties <<EOF
 DUYNHLAB_VERSION=smoke
 LOG_LEVEL=info
-ENV=test
+ENV=production
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_SSLMODE=disable

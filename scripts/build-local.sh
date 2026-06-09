@@ -9,9 +9,11 @@
 #   - git fetch && checkout main && pull --ff-only (unless DUYNHLAB_NO_GIT=1)
 #   - go build (CGO=0, GOOS=linux GOARCH=amd64)
 #   - tar -> build/<svc>/raw/<binary>-<ver>-linux-amd64.tar.gz
-#   - If db/migrations/sql/ exists -> build/<svc>/raw/<binary>-<ver>-migrations.tar.gz
-#   - SHA256 alongside each tarball
-#   - Frontend (type=static): npm ci && npm run build -> frontend-dist.tar.gz
+#   - SHA256 alongside the tarball
+#   - Migrations are embedded in the binary (//go:embed) — NOT tarred (D24). The
+#     highest migration version is recorded in build-info.env as SCHEMA_VERSION (audit).
+#   - Frontend (type=static): bake build.env (VITE_*) then npm ci && npm run build
+#     -> frontend-dist.tar.gz
 
 set -euo pipefail
 
@@ -113,27 +115,37 @@ case "$TYPE" in
     sha256_of "$TARBALL" > "${TARBALL}.sha256"
     log_ok "Binary tarball: ${TARBALL#$REPO_ROOT/} ($(du -h "$TARBALL" | cut -f1), sha256=$(cut -c1-12 < "${TARBALL}.sha256"))"
 
-    # Migrations
+    # Migrations are embedded in the binary (//go:embed); we do NOT ship loose SQL.
+    # Record the highest migration version for audit (SCHEMA_VERSION in build-info.env).
     MIG_SRC="$SRC_PATH/db/migrations/sql"
-    if [[ -d "$MIG_SRC" ]] && compgen -G "$MIG_SRC/*.sql" >/dev/null; then
-      MIG_TAR="$RAW_DIR/${BINARY}-${VERSION}-migrations.tar.gz"
-      tar -czf "$MIG_TAR" -C "$SRC_PATH/db/migrations" sql
-      sha256_of "$MIG_TAR" > "${MIG_TAR}.sha256"
-      log_ok "Migrations:     ${MIG_TAR#$REPO_ROOT/} ($(ls "$MIG_SRC"/*.sql | wc -l) files)"
+    if [[ -d "$MIG_SRC" ]] && compgen -G "$MIG_SRC/*.up.sql" >/dev/null; then
+      SCHEMA_VERSION=$(for f in "$MIG_SRC"/*.up.sql; do basename "$f" | cut -d_ -f1; done \
+        | sed 's/^0*//' | sort -n | tail -1)
+      SCHEMA_VERSION=${SCHEMA_VERSION:-0}
+      log_ok "Migrations:     embedded in binary, max version=$SCHEMA_VERSION ($(ls "$MIG_SRC"/*.up.sql | wc -l) up-files)"
     else
-      log_warn "No migrations dir ($MIG_SRC) — skipping migrations tarball"
+      log_warn "No migrations dir ($MIG_SRC) — SCHEMA_VERSION unset"
     fi
     ;;
 
   static)
     require_cmd npm
+    # Bake build-time env (e.g. VITE_API_BASE_URL) from services.yaml .build.env.
+    # Vite inlines these at build time — they cannot be changed at runtime.
+    BUILD_ENV=()
+    while IFS= read -r kv; do
+      [[ -z "$kv" ]] && continue
+      BUILD_ENV+=("$kv")
+      log_step "build env: $kv"
+    done < <(svc_build_env "$SERVICE")
+
     log_step "npm ci && npm run build -> dist/"
     STAGE=$(mktemp -d)
     trap 'rm -rf "$STAGE"' EXIT
 
     ( cd "$SRC_PATH"
       npm ci
-      npm run build
+      env ${BUILD_ENV[@]+"${BUILD_ENV[@]}"} npm run build
     )
 
     # Find build output (vite=dist, next=.next or out, cra=build)
@@ -163,6 +175,7 @@ VERSION=$VERSION
 GIT_SHA=$GIT_SHA
 GOOS=$GOOS
 GOARCH=$GOARCH
+SCHEMA_VERSION=${SCHEMA_VERSION:-}
 BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 SOURCE=local
 EOF

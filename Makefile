@@ -33,7 +33,6 @@ help:
 	@echo "  VERSION=$(VERSION)"
 	@echo "  DUYNHLAB_SRC_ROOT=$(DUYNHLAB_SRC_ROOT)"
 	@echo "  BUILD_RUNNER=host|podman|docker  (auto)"
-	@echo "  SKIP_MIGRATE_DOWNLOAD=1          skip golang-migrate fetch"
 
 fetch-sources:
 	@bash scripts/fetch-sources.sh $(REF)

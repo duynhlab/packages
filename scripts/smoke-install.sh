@@ -63,8 +63,9 @@ for svc in auth user product cart order review notification shipping; do
   file "$bin" | grep -q "ELF.*executable" || { echo "NOT ELF: $bin"; exit 1; }
   test -s "/opt/duynhlab/$svc/BINARY_VERSION" || { echo "MISSING BINARY_VERSION: $svc"; exit 1; }
   test -s "/opt/duynhlab/$svc/SCHEMA_VERSION" || { echo "MISSING SCHEMA_VERSION: $svc"; exit 1; }
-  ls /opt/duynhlab/$svc/migrations/sql/ >/dev/null \
-    || { echo "MISSING migrations: $svc"; exit 1; }
+  # Migrations are embedded in the binary — no loose SQL should be shipped (D24).
+  test ! -e "/opt/duynhlab/$svc/migrations" \
+    || { echo "UNEXPECTED migrations dir shipped: $svc"; exit 1; }
 done
 test -f /opt/duynhlab/frontend/dist/index.html
 test -d /opt/duynhlab/secret-tpl
@@ -80,10 +81,12 @@ echo "Layout OK"
 echo "::endgroup::"
 
 echo "::group::CLI symlinks"
-for c in duynhlab-ctl duynhlab-db-setup duynhlab-db-migrate \
+for c in duynhlab-ctl duynhlab-db-setup \
          duynhlab-gen-env duynhlab-gen-password; do
   which "$c"
 done
+# duynhlab-db-migrate must NOT exist anymore (D23).
+! which duynhlab-db-migrate 2>/dev/null || { echo "UNEXPECTED duynhlab-db-migrate present"; exit 1; }
 duynhlab-gen-password 16 || true
 test -f /etc/duynhlab/services.yaml || { echo "services.yaml not dropped"; exit 1; }
 yq '.services[].name' /etc/duynhlab/services.yaml | tr '\n' ' '; echo
