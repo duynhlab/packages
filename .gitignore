@@ -12,7 +12,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Internal planning docs
+# Internal planning docs (AGENTS.md is tracked — see repo root)
 plan.md
 plan-spec.md
-AGENTS.md
