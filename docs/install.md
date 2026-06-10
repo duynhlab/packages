@@ -167,7 +167,7 @@ If you want to exercise the install path without GitHub Pages:
 
 ```bash
 cd packages
-make build-local-all build smoke
+make build-local-all build test-install
 # Stage a local YUM tree:
 REPO_OUT=/tmp/duynhlab-repo \
   BASE_URL=http://localhost:8080 \

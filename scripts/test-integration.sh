@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/smoke-full.sh — full-systemd smoke test (Phase 2.2).
+# scripts/test-integration.sh — full-systemd integration test.
 #
 # Spins up:
 #   * 1 podman pod (default) with a Postgres 16 sidecar
@@ -24,13 +24,13 @@
 #   APP_IMAGE           systemd-capable EL9 image (must contain /sbin/init).
 #                       The default centos:stream9 is MINIMAL and has NO systemd —
 #                       build one first, e.g.:
-#                         podman build -t localhost/duynhlab-smoke-init - <<'D'
+#                         podman build -t localhost/duynhlab-test-init - <<'D'
 #                         FROM quay.io/centos/centos:stream9
 #                         RUN dnf -y install systemd && dnf clean all
 #                         D
-#                       then run with APP_IMAGE=localhost/duynhlab-smoke-init
+#                       then run with APP_IMAGE=localhost/duynhlab-test-init
 #   POSTGRES_PASSWORD   randomly generated if unset
-#   POD_NAME            duynhlab-smoke
+#   POD_NAME            duynhlab-test
 #   KEEP_POD=1          don't tear down on exit (debug)
 set -euo pipefail
 
@@ -43,7 +43,7 @@ require_cmd podman
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-docker.io/postgres:16-alpine}"
 APP_IMAGE="${APP_IMAGE:-quay.io/centos/centos:stream9}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(head -c 24 /dev/urandom | base64 | tr -d '+/=' | head -c 24)}"
-POD_NAME="${POD_NAME:-duynhlab-smoke}"
+POD_NAME="${POD_NAME:-duynhlab-test}"
 APP_NAME="$POD_NAME-app"
 DB_NAME_C="$POD_NAME-db"
 
@@ -146,7 +146,7 @@ log_step "rewrite env-global.properties to talk to sidecar postgres"
 exec_app '
   install -m 0644 /etc/duynhlab/env-global.properties /etc/duynhlab/env-global.properties.bak
   cat > /etc/duynhlab/env-global.properties <<EOF
-DUYNHLAB_VERSION=smoke
+DUYNHLAB_VERSION=integration-test
 LOG_LEVEL=info
 ENV=production
 DB_HOST=127.0.0.1
@@ -210,5 +210,5 @@ fi
 
 echo ""
 echo "================================================================"
-echo "  FULL SMOKE TEST PASSED — all backends healthy on real systemd"
+echo "  INTEGRATION TEST PASSED — all backends healthy on real systemd"
 echo "================================================================"

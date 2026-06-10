@@ -15,7 +15,7 @@ Guide for AI agents and contributors working on `duynhlab/packages`.
 - **Branching:** never commit on `main`; branch first (`feat/…`, `fix/…`, `docs/…`) and open a PR.
 - **Pre-PR checks:**
   - `bash -n` every script you touched (and `shellcheck` if installed).
-  - `make build` must produce a clean RPM; run `make smoke` (and `make smoke-full` when changing
+  - `make build` must produce a clean RPM; run `make test-install` (and `make test-integration` when changing
     runtime/migration/systemd behavior).
   - Keep changes surgical — every changed line should trace to the task (see `CLAUDE.md`).
 - **Scope:** service *code* lives in the `duynhlab/<svc>-service` repos, not here. This repo only
@@ -50,7 +50,7 @@ amd64.
 
 ```
 services.yaml                  Single source of truth: every service (repo/binary/port/grpc_port/db/deps)
-Makefile                       Local entrypoint (fetch-sources, build-local, stage, build, smoke, …)
+Makefile                       Local entrypoint (fetch-sources, build-local, stage, build, test-install, …)
 scripts/                       Build / render / ops scripts
 ├── lib/common.sh              Shared bash helpers (yq accessors: svc_field, svc_build_env, logging)
 ├── fetch-sources.sh           git clone/pull each service repo
@@ -59,7 +59,7 @@ scripts/                       Build / render / ops scripts
 ├── stage-all.sh               Assemble FHS payload → Source0 staging tarball
 ├── build-rpm.sh               rpmbuild specs/duynhlab.spec → dist/*.rpm (host/podman/docker)
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
-└── smoke-install.sh / smoke-full.sh   install / full-systemd smoke tests
+└── test-install.sh / test-integration.sh   install / integration tests
 packages/
 ├── common/scripts/            duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env, duynhlab-gen-password
 └── rpm/
@@ -70,7 +70,7 @@ packages/
     └── lib/                   init-service.sh, password-generator.sh
 specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          architecture.md, build.md, operations.md, install.md
-.github/workflows/             build.yml (build + smoke-full jobs), publish-yum-repo.yml
+.github/workflows/             build.yml (build + test-integration jobs), publish-yum-repo.yml
 build/  dist/                  Generated, gitignored — never hand-edit
 plan-spec.md                   Internal roadmap + decisions + backlog (gitignored)
 ```
@@ -114,14 +114,14 @@ make build-local-all            # build every service in services.yaml
 make render-systemd             # render units only
 make stage                      # assemble Source0 staging tarball
 make build                      # stage + rpmbuild -> dist/
-make smoke                      # file-level install check (Rocky 9 container)
-make smoke-full                 # full systemd boot + health (podman + Postgres sidecar)
+make test-install               # file-level install check (Rocky 9 container)
+make test-integration           # full systemd boot + health (podman + Postgres sidecar)
 make publish-repo               # stage gh-pages YUM tree
 make clean                      # rm build/ dist/
 ```
 
 Env knobs: `VERSION` (CalVer default), `DUYNHLAB_SRC_ROOT` (default `..`),
-`BUILD_RUNNER` (`host|podman|docker`), `APP_IMAGE` (smoke-full systemd image).
+`BUILD_RUNNER` (`host|podman|docker`), `APP_IMAGE` (test-integration systemd image).
 Lint = `bash -n` on every script (+ `shellcheck` when available). No Go toolchain build here — binaries
 come pre-built from the service repos.
 
@@ -155,21 +155,21 @@ come pre-built from the service repos.
 - **Ops CLI:** `duynhlab-ctl {list,start,stop,restart,status,enable,disable,logs,health,version,config,ports}`;
   `duynhlab-db-setup <svc> {bootstrap,migrate,status}` (`bootstrap` needs `SUPERUSER_DSN`).
 
-## Smoke testing
+## Testing
 
-- **`smoke-install.sh`** — installs the RPM in a `rockylinux:9` container, asserts the FHS layout and
+- **`test-install.sh`** — installs the RPM in a `rockylinux:9` container, asserts the FHS layout and
   that **no `migrations/` dir** and **no `duynhlab-db-migrate`** are shipped.
-- **`smoke-full.sh`** — podman pod with a Postgres 16 sidecar + a systemd app container; installs the
+- **`test-integration.sh`** — podman pod with a Postgres 16 sidecar + a systemd app container; installs the
   RPM, runs `bootstrap`+`migrate`+`status` per backend, `enable --now duynhlab-platform.target`, then
   `curl /health` for each service. Uses `ENV=production`.
   - **`APP_IMAGE` must contain `/sbin/init`.** The default `centos:stream9` is minimal (no systemd) —
     build one first:
     ```
-    podman build -t localhost/duynhlab-smoke-init - <<'D'
+    podman build -t localhost/duynhlab-test-init - <<'D'
     FROM quay.io/centos/centos:stream9
     RUN dnf -y install systemd && dnf clean all
     D
-    APP_IMAGE=localhost/duynhlab-smoke-init make smoke-full
+    APP_IMAGE=localhost/duynhlab-test-init make test-integration
     ```
 
 ## Gotchas and non-obvious rules

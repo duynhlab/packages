@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# smoke-install.sh — End-to-end install test for the mega-RPM in Rocky 9.
+# test-install.sh — End-to-end install test for the mega-RPM in Rocky 9.
 #
 # Verifies:
 #   - dnf localinstall succeeds and resolves all dependencies via EPEL + module
@@ -27,7 +27,7 @@ case $RUNNER in
   *)      VOL_OPTS="" ;;
 esac
 
-log_step "Running smoke test inside rockylinux:9 ($RUNNER)"
+log_step "Running install test inside rockylinux:9 ($RUNNER)"
 
 "$RUNNER" run --rm -i \
   -v "$REPO_ROOT:/work$VOL_OPTS" \
@@ -170,6 +170,6 @@ echo "::endgroup::"
 
 echo ""
 echo "================================================================"
-echo "  SMOKE TEST PASSED"
+echo "  INSTALL TEST PASSED"
 echo "================================================================"
 INNER
