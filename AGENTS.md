@@ -60,7 +60,7 @@ scripts/                       Build / render / ops scripts
 ├── build-rpm.sh               rpmbuild specs/duynhlab.spec → dist/*.rpm (host/podman/docker)
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
 └── smoke-install.sh / smoke-full.sh   install / full-systemd smoke tests
-packaging/
+packages/
 ├── common/scripts/            duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env, duynhlab-gen-password
 └── rpm/
     ├── systemd/               duynhlab-service.tmpl.service, *.target(.tmpl)

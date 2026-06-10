@@ -148,7 +148,7 @@ packages/
 │   ├── publish-yum-repo.sh      createrepo_c -> gh-pages tree
 │   ├── smoke-install.sh         file-level install verification
 │   └── smoke-full.sh            full systemd smoke (podman + Postgres sidecar)
-├── packaging/
+├── packages/
 │   ├── common/scripts/        CLI tools (duynhlab-ctl, duynhlab-db-setup, …)
 │   └── rpm/                    spec assets: scriptlets, systemd tmpl, nginx,
 │                              valkey, postgresql, logrotate, secret-tpl, lib
