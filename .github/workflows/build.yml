@@ -27,7 +27,7 @@ env:
 
 jobs:
   build:
-    name: Build & smoke-test all RPMs
+    name: Build & install-test all RPMs
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -94,11 +94,11 @@ jobs:
         working-directory: packages
         run: ls -lh dist/
 
-      - name: Smoke install inside Rocky 9
+      - name: Install test (Rocky 9)
         working-directory: packages
         env:
           CONTAINER_RUNNER: docker
-        run: ./scripts/smoke-install.sh
+        run: ./scripts/test-install.sh
 
       - name: Upload RPM artefacts
         if: success() || failure()
@@ -109,12 +109,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Full systemd + Postgres smoke. Reuses the RPM artifact from `build` — no rebuild.
-  # Runs on main pushes + manual dispatch only (PRs already get the file-level smoke
+  # Integration test: full systemd + Postgres. Reuses the RPM artifact from `build` — no rebuild.
+  # Runs on main pushes + manual dispatch only (PRs already get the file-level install test
   # above). Because publish-yum-repo triggers on this workflow's success, a failing
-  # full smoke also blocks the release.
-  smoke-full:
-    name: Full systemd + Postgres smoke
+  # failing integration test also blocks the release.
+  test-integration:
+    name: Integration test (systemd + Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: build
@@ -139,33 +139,33 @@ jobs:
           sudo apt-get install -y -qq podman uidmap
           podman --version
 
-      # smoke-full.sh boots a systemd container; the default centos:stream9 image is
+      # test-integration.sh boots a systemd container; the default centos:stream9 image is
       # minimal and has NO /sbin/init — build a systemd-capable image first.
       # Everything runs ROOTLESS: root podman + systemd-in-container breaks on the
       # ubuntu runners ("systemd did not start", run 27274677129), while the rootless
       # path is the one validated end-to-end. Same user for build + run = same storage.
       - name: Build systemd-capable app image
         run: |
-          podman build -t localhost/duynhlab-smoke-init:latest -f - . <<'EOF'
+          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
           FROM quay.io/centos/centos:stream9
           RUN dnf -y install systemd && dnf clean all
           EOF
 
-      # KEEP_POD=1: smoke-full.sh's cleanup trap would otherwise remove the pod on
+      # KEEP_POD=1: test-integration.sh's cleanup trap would otherwise remove the pod on
       # failure, leaving the journal-dump step below with nothing to inspect. The
       # runner is ephemeral, so skipping cleanup is free.
-      - name: Full smoke (systemd + Postgres)
+      - name: Integration test
         working-directory: packages
         env:
-          APP_IMAGE: localhost/duynhlab-smoke-init:latest
+          APP_IMAGE: localhost/duynhlab-test-init:latest
           KEEP_POD: "1"
-        run: ./scripts/smoke-full.sh
+        run: ./scripts/test-integration.sh
 
       - name: Dump app journal on failure
         if: failure()
         run: |
           set +e
           podman ps -a
-          podman logs duynhlab-smoke-app    | tail -300 || true
-          podman logs duynhlab-smoke-db     | tail -100 || true
-          podman exec duynhlab-smoke-app journalctl -xe --no-pager | tail -500 || true
+          podman logs duynhlab-test-app    | tail -300 || true
+          podman logs duynhlab-test-db     | tail -100 || true
+          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true

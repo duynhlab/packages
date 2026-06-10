@@ -5,7 +5,7 @@
 # + CLI tools + nginx/valkey/postgresql config templates.
 
 .PHONY: help all fetch-sources build-local build-local-all render-systemd \
-        stage build smoke smoke-full publish-repo clean
+        stage build test-install test-integration publish-repo clean
 
 SERVICE          ?=
 VERSION          ?= $(shell date -u +%Y.%m.%d)
@@ -23,10 +23,10 @@ help:
 	@echo "  render-systemd             Render unit + target files (build/staging/systemd/)"
 	@echo "  stage                      Assemble the Source0 staging tarball"
 	@echo "  build                      Run rpmbuild (host or container) -> dist/"
-	@echo "  smoke                      Install dist/*.rpm in Rocky 9 + verify"
-	@echo "  smoke-full                 Full smoke: podman --systemd=always + Postgres sidecar"
+	@echo "  test-install               Install dist/*.rpm in Rocky 9 + verify"
+	@echo "  test-integration           Boot platform: podman --systemd=always + Postgres sidecar"
 	@echo "  publish-repo               Stage gh-pages YUM repo (build/gh-pages/)"
-	@echo "  all                        stage + build + smoke"
+	@echo "  all                        stage + build + test-install"
 	@echo "  clean                      Remove build/ and dist/"
 	@echo ""
 	@echo "Environment:"
@@ -56,16 +56,16 @@ stage:
 build: stage
 	@bash scripts/build-rpm.sh
 
-smoke:
-	@bash scripts/smoke-install.sh
+test-install:
+	@bash scripts/test-install.sh
 
-smoke-full:
-	@bash scripts/smoke-full.sh
+test-integration:
+	@bash scripts/test-integration.sh
 
 publish-repo:
 	@bash scripts/publish-yum-repo.sh
 
-all: stage build smoke
+all: stage build test-install
 
 clean:
 	@rm -rf dist/ build/

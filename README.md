@@ -30,7 +30,7 @@ upgrade, remove): [`docs/install.md`](docs/install.md).
 make fetch-sources          # clone every service repo into ../
 make build-local-all        # compile binaries + frontend dist
 make build                  # stage Source0 tarball + rpmbuild -> dist/*.rpm
-make smoke                  # file-level install check in Rocky 9
+make test-install           # file-level install check in Rocky 9
 ```
 
 `BUILD_RUNNER=host|podman|docker` is auto-detected. Full pipeline, scripts, and
@@ -40,7 +40,7 @@ Makefile reference: [`docs/build.md`](docs/build.md).
 
 `build-rpms` ([`build.yml`](.github/workflows/build.yml)) validates every PR and
 push to `main` (docs-only changes are skipped): job `build` compiles everything,
-builds the mega-RPM and smoke-installs it; job `smoke-full` (main + manual) boots
+builds the mega-RPM and install-tests it; job `test-integration` (main + manual) boots
 the RPM under real systemd with a Postgres sidecar. Only when `build-rpms` is
 green on `main` does `publish-yum-repo`
 ([`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml)) upload the RPM

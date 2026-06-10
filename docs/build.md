@@ -22,7 +22,7 @@ flowchart TD
   SRC0 --> BR[build-rpm.sh]
   SPEC[specs/duynhlab.spec] --> BR
   BR -->|rpmbuild| RPM[dist/duynhlab-VER-1.el9.x86_64.rpm]
-  RPM --> SM[smoke-install.sh / smoke-full.sh]
+  RPM --> SM[test-install.sh / test-integration.sh]
   RPM --> PUB[publish-yum-repo.sh]
   PUB -->|createrepo_c| GH[gh-pages YUM repo]
 ```
@@ -59,8 +59,8 @@ All scripts live in [`scripts/`](../scripts) and source
 >
 > Keep SRPMs only if you ever distribute via Fedora/EPEL or must ship source for
 > compliance — neither applies here.
-| `smoke-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
-| `smoke-full.sh` | `dist/*.rpm` | — | Full systemd boot + health check (podman + Postgres) |
+| `test-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
+| `test-integration.sh` | `dist/*.rpm` | — | Full systemd boot + health check (podman + Postgres) |
 
 ### Runner auto-detection
 
@@ -86,10 +86,10 @@ make build-local-all          # build every service in services.yaml
 make render-systemd           # render units only
 make stage                    # build Source0 staging tarball
 make build                    # stage + rpmbuild -> dist/
-make smoke                    # file-level install check
-make smoke-full               # full systemd smoke (podman + Postgres)
+make test-install             # file-level install check
+make test-integration         # full systemd boot + health (podman + Postgres)
 make publish-repo             # stage gh-pages YUM tree
-make all                      # stage + build + smoke
+make all                      # stage + build + test-install
 make clean                    # rm build/ dist/
 ```
 
@@ -115,10 +115,10 @@ make build
 ls -lh dist/                 # duynhlab-2026.06.01-1.el9.x86_64.rpm
 
 # 3. verify it installs cleanly
-make smoke
+make test-install
 
 # 4. (optional) full boot test with a real Postgres + systemd
-make smoke-full              # needs podman with cgroup v2
+make test-integration        # needs podman with cgroup v2
 
 # 5. (optional) stage a local YUM mirror
 REPO_OUT=/tmp/duynhlab-repo BASE_URL=http://localhost:8080 \
@@ -131,7 +131,7 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 ```mermaid
 flowchart LR
   PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build]
-  B -->|artifact, main only| S[build-rpms: smoke-full]
+  B -->|artifact, main only| S[build-rpms: test-integration]
   S -->|success on main| P[publish-yum-repo]
   P -->|gh release upload| REL[(GitHub Release<br/>RPM asset)]
   P -->|createrepo_c --location-prefix| GH[(gh-pages<br/>repodata only)]
@@ -140,7 +140,7 @@ flowchart LR
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → smoke-install → upload artefact. Job `smoke-full` (main + manual only, `needs: build`): download artifact → podman + systemd image → full systemd + Postgres smoke. A failing smoke-full blocks publish. |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact. Job `test-integration` (main + manual only, `needs: build`): download artifact → podman + systemd image → full systemd + Postgres integration test. A failing test-integration blocks publish. |
 | **publish-yum-repo** | [`publish-yum-repo.yml`](../.github/workflows/publish-yum-repo.yml) | `workflow_run` after build-rpms on `main`, manual | rebuild RPM → **`gh release create v<VER>` + upload RPM** → `createrepo_c --location-prefix <release-url>` → force-push orphan `gh-pages` (repodata only) → `deploy-pages` |
 
 > **Critical ordering**: `stage-all.sh` must run before `build-rpm.sh` — the
