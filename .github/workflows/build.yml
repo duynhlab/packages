@@ -141,25 +141,31 @@ jobs:
 
       # smoke-full.sh boots a systemd container; the default centos:stream9 image is
       # minimal and has NO /sbin/init — build a systemd-capable image first.
-      # Built with sudo because smoke-full.sh runs under sudo (root podman storage).
+      # Everything runs ROOTLESS: root podman + systemd-in-container breaks on the
+      # ubuntu runners ("systemd did not start", run 27274677129), while the rootless
+      # path is the one validated end-to-end. Same user for build + run = same storage.
       - name: Build systemd-capable app image
         run: |
-          sudo podman build -t localhost/duynhlab-smoke-init:latest -f - . <<'EOF'
+          podman build -t localhost/duynhlab-smoke-init:latest -f - . <<'EOF'
           FROM quay.io/centos/centos:stream9
           RUN dnf -y install systemd && dnf clean all
           EOF
 
+      # KEEP_POD=1: smoke-full.sh's cleanup trap would otherwise remove the pod on
+      # failure, leaving the journal-dump step below with nothing to inspect. The
+      # runner is ephemeral, so skipping cleanup is free.
       - name: Full smoke (systemd + Postgres)
         working-directory: packages
         env:
           APP_IMAGE: localhost/duynhlab-smoke-init:latest
-        run: sudo -E ./scripts/smoke-full.sh
+          KEEP_POD: "1"
+        run: ./scripts/smoke-full.sh
 
       - name: Dump app journal on failure
         if: failure()
         run: |
           set +e
-          sudo podman ps -a
-          sudo podman logs duynhlab-smoke-app    | tail -300 || true
-          sudo podman logs duynhlab-smoke-db     | tail -100 || true
-          sudo podman exec duynhlab-smoke-app journalctl -xe --no-pager | tail -500 || true
+          podman ps -a
+          podman logs duynhlab-smoke-app    | tail -300 || true
+          podman logs duynhlab-smoke-db     | tail -100 || true
+          podman exec duynhlab-smoke-app journalctl -xe --no-pager | tail -500 || true

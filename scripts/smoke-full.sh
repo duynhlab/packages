@@ -110,7 +110,7 @@ podman run -d \
   /sbin/init >/dev/null
 
 log_info "waiting for systemd inside container"
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   if podman exec "$APP_NAME" systemctl is-system-running >/dev/null 2>&1 \
      || podman exec "$APP_NAME" systemctl is-system-running 2>/dev/null \
         | grep -qE '^(running|degraded|starting)$'; then
@@ -118,7 +118,11 @@ for i in $(seq 1 30); do
     break
   fi
   sleep 1
-  [[ $i == 30 ]] && die "systemd did not start in 30s"
+  if [[ $i == 60 ]]; then
+    # Surface the container console before dying — PID1 errors land there.
+    podman logs "$APP_NAME" 2>&1 | tail -40 >&2 || :
+    die "systemd did not start in 60s"
+  fi
 done
 
 exec_app() {
