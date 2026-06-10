@@ -13,5 +13,4 @@ build/
 Thumbs.db
 
 # Internal planning docs (AGENTS.md is tracked — see repo root)
-plan.md
 plan-spec.md

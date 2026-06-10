@@ -2,9 +2,9 @@
 
 Guide for AI agents and contributors working on `duynhlab/packages`.
 
-> **Source of truth:** [`plan.md`](./plan.md) holds the locked decisions (D1–D27), open-question
-> status, phase tracker, and diagrams. It is gitignored (internal). **Read it before any structural
-> change.** `services.yaml` is the source of truth for the service list.
+> **Source of truth:** [`plan-spec.md`](./plan-spec.md) holds the locked decisions (S-D1…S-D17),
+> the roadmap status, and the Backlog of undecided items. It is gitignored (internal). **Read it
+> before any structural change.** `services.yaml` is the source of truth for the service list.
 
 ## Contribution workflow for AI agents
 
@@ -72,7 +72,7 @@ specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          architecture.md, build.md, operations.md, install.md
 .github/workflows/             build.yml, publish-yum-repo.yml, smoke-test-rpm.yml
 build/  dist/                  Generated, gitignored — never hand-edit
-plan.md                        Internal roadmap + decisions (gitignored)
+plan-spec.md                   Internal roadmap + decisions + backlog (gitignored)
 ```
 
 ## Packaging architecture
@@ -135,7 +135,7 @@ come pre-built from the service repos.
 - `build/sources/duynhlab-<ver>-staging.tar.gz` — the SPEC's `Source0`
 - `dist/*.rpm` — output packages
 
-`plan.md` / `plan-spec.md` stay gitignored (internal). `AGENTS.md` (this file) is tracked.
+`plan-spec.md` stays gitignored (internal). `AGENTS.md` (this file) is tracked.
 
 ## Conventions
 
@@ -177,7 +177,7 @@ come pre-built from the service repos.
 - **Migrations live in the binary**, not in the RPM. Don't reintroduce a `duynhlab-db-migrate` binary,
   loose `.sql`, or Flyway→golang-migrate filename conversion (D23/D24).
 - **Mega-RPM, not nFPM** (D27). `nfpm` is referenced nowhere; any `build/*/nfpm.yaml` are dead.
-- **`plan.md` is the gitignored source of truth** — read it before structural changes.
+- **`plan-spec.md` is the gitignored source of truth** — read it before structural changes.
 - **Every service defaults to HTTP `8080` and gRPC `9090` in code.** On a shared host they collide, so
   `PORT`/`GRPC_PORT` MUST be set per service from `services.yaml` (`port`, `grpc_port`).
 - **Env path is flat:** `/etc/duynhlab/<svc>.env`.
