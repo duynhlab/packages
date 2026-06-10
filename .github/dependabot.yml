@@ -1,0 +1,20 @@
+# Dependabot — this repo repacks pre-built binaries, so the only tracked
+# ecosystem is GitHub Actions (no go.mod / package.json / Dockerfile here;
+# container images used in workflows/scripts are inline and not trackable).
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "github-actions"]
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    # Bundle all action bumps into one PR — each PR triggers a full ~12-min
+    # build, so one grouped PR beats eight individual ones.
+    groups:
+      gh-actions:
+        patterns: ["*"]
