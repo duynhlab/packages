@@ -80,21 +80,24 @@ Two GitHub Actions workflows split the pipeline into **validate** and **publish*
 
 ```mermaid
 flowchart LR
-  PR[Pull request] --> B
-  PUSH[Push to main] --> B
-  B[build-rpms<br/>build.yml] -->|on success<br/>workflow_run| P[publish-yum-repo<br/>publish-yum-repo.yml]
-  P --> PAGES[gh-pages YUM repo]
+  PR[PR / push to main<br/>except docs/** and *.md] --> B[build-rpms: build]
+  B -->|RPM artifact, main + manual only| S[build-rpms: smoke-full]
+  S -->|on success<br/>workflow_run| P[publish-yum-repo]
+  P -->|gh release upload| REL[(GitHub Release<br/>RPM asset)]
+  P -->|repodata only| PAGES[gh-pages → Pages]
 ```
 
 | Workflow | File | Triggers | What it does |
 |---|---|---|---|
-| `build-rpms` | [`build.yml`](.github/workflows/build.yml) | PR + push to `main`, `workflow_dispatch` | Build & smoke-test the mega-RPM |
-| `publish-yum-repo` | [`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml) | After `build-rpms` succeeds on `main` (`workflow_run`), `workflow_dispatch` | Accumulate the YUM repo on `gh-pages`, then deploy it via `actions/deploy-pages` |
+| `build-rpms` | [`build.yml`](.github/workflows/build.yml) | PR + push to `main` (skips `docs/**` and `**.md`), `workflow_dispatch` | Job `build`: build + file-level smoke + upload artifact. Job `smoke-full` (main + manual only): full systemd + Postgres smoke against the artifact |
+| `publish-yum-repo` | [`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml) | After `build-rpms` succeeds on `main` (`workflow_run`), `workflow_dispatch` | Upload the RPM to a **GitHub Release**, regenerate YUM metadata pointing at it, force-push `gh-pages` (repodata only), deploy Pages |
 
 ### `build-rpms` — validate on every change
 
-Runs on every PR and every push to `main`. It proves a change still produces an
-installable package **before** anything is published. Steps:
+Runs on every PR and push to `main`, **except docs-only changes** (`docs/**`,
+`**.md`) — those build nothing and therefore publish nothing. Two jobs:
+
+**Job `build`** (always):
 
 1. Fetch every service source (`fetch-sources.sh`).
 2. Build all 8 backends + frontend (`build-local.sh` per service from `services.yaml`).
@@ -103,37 +106,35 @@ installable package **before** anything is published. Steps:
 5. **Smoke-install** the RPM inside Rocky 9 (`smoke-install.sh`) to catch scriptlet/dependency errors.
 6. Upload the RPM as a build artefact (kept 14 days).
 
+**Job `smoke-full`** (main pushes + manual only, `needs: build`): downloads the
+RPM artifact (no rebuild), builds a systemd-capable container image, then runs
+the full systemd + Postgres smoke (`smoke-full.sh`): per-service DB bootstrap +
+migrate, `duynhlab-platform.target` boot, `/health` on all 8 backends.
+
 **Why it's needed:** it is the gate. It has `contents: read` only — it never
-publishes. A red `build-rpms` blocks the PR and prevents a broken RPM from ever
-reaching users.
+publishes. A red job (including `smoke-full`) means `build-rpms` fails, which
+blocks the PR **and** stops `publish-yum-repo` from firing.
 
 ### `publish-yum-repo` — publish after a green build
 
 Triggered by `workflow_run` only when `build-rpms` finished **successfully on
 `main`** (so PRs never publish), or manually via `workflow_dispatch`. Steps:
 
-1. Check out `main` and the persistent `gh-pages` branch.
-2. Rebuild the mega-RPM (same pipeline as `build-rpms`).
-3. `publish-yum-repo.sh` runs `createrepo_c` to **incrementally update** the YUM
-   metadata into the `gh-pages` working tree (old RPMs + new RPM).
-4. Commit and push `gh-pages` — the **durable accumulator** that retains every
-   previously published RPM.
-5. Upload that tree as a Pages artifact and deploy it with
-   `actions/deploy-pages`; GitHub then serves
-   `https://duynhlab.github.io/packages`.
+1. Check out `main`, rebuild the mega-RPM (same pipeline).
+2. **`gh release create v<VERSION>`** and upload the RPM as a release asset
+   (or `--clobber` into the existing release for that version).
+3. `createrepo_c --location-prefix <release-download-url>` — the YUM metadata's
+   `<location href>` is an absolute URL pointing at the Release asset.
+4. Force-push `gh-pages` as a **single-commit orphan branch** containing only
+   `repodata/`, `duynhlab.repo`, and the landing page (KB-sized).
+5. Deploy via `actions/deploy-pages` — `dnf` reads metadata from Pages and
+   downloads the RPM straight from GitHub Releases.
 
-**Why both a branch and the Pages artifact?** GitHub's artifact-based Pages
-deploy (`deploy-pages`) **fully replaces** the site on every run — it has no
-incremental mode. A YUM repo is incremental: `createrepo_c --update` must see
-the previously published RPMs to re-index them. So the `gh-pages` branch is the
-source of truth that *accumulates* RPMs across runs, and each deploy simply
-serves the full current tree from that branch. Validation is also separated
-from publishing (only merged `main` publishes); the `[skip ci]` commit message
-and the success-on-`main` condition prevent an infinite build↔publish loop. The
-job needs `contents: write` (push `gh-pages`), `pages: write`, and `id-token:
-write` (deploy).
-
-
+**Why Releases instead of committing RPMs to gh-pages?** GitHub rejects any
+git-pushed file over 100 MB and the mega-RPM (~70 MB, growing) would bloat the
+branch history on every release. Release assets allow 2 GB per file, and the
+orphan, metadata-only `gh-pages` stays tiny forever. The job needs
+`contents: write` (releases + gh-pages), `pages: write`, and `id-token: write`.
 
 ```
 packages/
