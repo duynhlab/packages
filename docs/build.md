@@ -130,19 +130,18 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 
 ```mermaid
 flowchart LR
-  PR[PR / push to main] --> B[build-rpms]
-  B -->|success on main| P[publish-yum-repo]
+  PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build]
+  B -->|artifact, main only| S[build-rpms: smoke-full]
+  S -->|success on main| P[publish-yum-repo]
   P -->|gh release upload| REL[(GitHub Release<br/>RPM asset)]
   P -->|createrepo_c --location-prefix| GH[(gh-pages<br/>repodata only)]
-  MAN1[workflow_dispatch] --> S[smoke-test-rpm]
   MAN2[workflow_dispatch] --> P
 ```
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main`, manual | fetch → build-local → render-systemd → **stage-all** → build-rpm → smoke-install → upload artefact |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → smoke-install → upload artefact. Job `smoke-full` (main + manual only, `needs: build`): download artifact → podman + systemd image → full systemd + Postgres smoke. A failing smoke-full blocks publish. |
 | **publish-yum-repo** | [`publish-yum-repo.yml`](../.github/workflows/publish-yum-repo.yml) | `workflow_run` after build-rpms on `main`, manual | rebuild RPM → **`gh release create v<VER>` + upload RPM** → `createrepo_c --location-prefix <release-url>` → force-push orphan `gh-pages` (repodata only) → `deploy-pages` |
-| **smoke-test-rpm** | [`smoke-test-rpm.yml`](../.github/workflows/smoke-test-rpm.yml) | manual, `workflow_call` | full systemd smoke in podman |
 
 > **Critical ordering**: `stage-all.sh` must run before `build-rpm.sh` — the
 > spec's `Source0` is the staging tarball. Every build workflow includes that
