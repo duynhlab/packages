@@ -81,21 +81,21 @@ tar -xzf "$frontend_tgz" -C "$OPT/frontend"
 log_ok "staged frontend"
 
 # ── 3. CLI tools + library scripts ────────────────────────────────────────────
-install -m 0755 "$REPO_ROOT/packaging/common/scripts/duynhlab-ctl"           "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packaging/common/scripts/duynhlab-db-setup"      "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packaging/common/scripts/duynhlab-gen-env"       "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packaging/common/scripts/duynhlab-gen-password"  "$OPT/lib/"
-install -m 0644 "$REPO_ROOT/packaging/common/scripts/duynhlab-ctl.bash-completion" "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packaging/rpm/lib/init-service.sh"               "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packaging/rpm/lib/password-generator.sh"         "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-ctl"           "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-db-setup"      "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-gen-env"       "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-gen-password"  "$OPT/lib/"
+install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhlab-ctl.bash-completion" "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/rpm/lib/init-service.sh"               "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/rpm/lib/password-generator.sh"         "$OPT/lib/"
 log_ok "staged CLI + lib"
 
 # ── 4. Config templates ───────────────────────────────────────────────────────
-cp -a "$REPO_ROOT/packaging/rpm/nginx/."      "$OPT/nginx/"
-cp -a "$REPO_ROOT/packaging/rpm/valkey/."     "$OPT/valkey/"
-cp -a "$REPO_ROOT/packaging/rpm/postgresql/." "$OPT/postgresql/"
-cp -a "$REPO_ROOT/packaging/rpm/secret-tpl/." "$OPT/secret-tpl/"
-cp -a "$REPO_ROOT/packaging/rpm/logrotate/."  "$OPT/logrotate/"
+cp -a "$REPO_ROOT/packages/rpm/nginx/."      "$OPT/nginx/"
+cp -a "$REPO_ROOT/packages/rpm/valkey/."     "$OPT/valkey/"
+cp -a "$REPO_ROOT/packages/rpm/postgresql/." "$OPT/postgresql/"
+cp -a "$REPO_ROOT/packages/rpm/secret-tpl/." "$OPT/secret-tpl/"
+cp -a "$REPO_ROOT/packages/rpm/logrotate/."  "$OPT/logrotate/"
 log_ok "staged config templates"
 
 # ── 5. services.yaml + env-global.properties ──────────────────────────────────

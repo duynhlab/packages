@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 . "$SCRIPT_DIR/lib/common.sh"
 
-TPL_DIR="$REPO_ROOT/packaging/rpm/systemd"
+TPL_DIR="$REPO_ROOT/packages/rpm/systemd"
 OUT_DIR="${1:-$BUILD_DIR/systemd}"
 mkdir -p "$OUT_DIR"
 
