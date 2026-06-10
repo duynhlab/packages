@@ -70,7 +70,7 @@ packages/
     └── lib/                   init-service.sh, password-generator.sh
 specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          architecture.md, build.md, operations.md, install.md
-.github/workflows/             build.yml, publish-yum-repo.yml, smoke-test-rpm.yml
+.github/workflows/             build.yml (build + smoke-full jobs), publish-yum-repo.yml
 build/  dist/                  Generated, gitignored — never hand-edit
 plan-spec.md                   Internal roadmap + decisions + backlog (gitignored)
 ```

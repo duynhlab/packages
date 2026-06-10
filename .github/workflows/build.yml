@@ -3,8 +3,14 @@ name: build-rpms
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
   workflow_dispatch:
     inputs:
       ref:
@@ -102,3 +108,58 @@ jobs:
           path: packages/dist/*.rpm
           if-no-files-found: error
           retention-days: 14
+
+  # Full systemd + Postgres smoke. Reuses the RPM artifact from `build` — no rebuild.
+  # Runs on main pushes + manual dispatch only (PRs already get the file-level smoke
+  # above). Because publish-yum-repo triggers on this workflow's success, a failing
+  # full smoke also blocks the release.
+  smoke-full:
+    name: Full systemd + Postgres smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout packages repo
+        uses: actions/checkout@v6
+        with:
+          path: packages
+
+      - name: Download RPM artifact from build job
+        uses: actions/download-artifact@v7
+        with:
+          name: duynhlab-rpms
+          path: packages/dist
+
+      - name: Install podman
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman uidmap
+          podman --version
+
+      # smoke-full.sh boots a systemd container; the default centos:stream9 image is
+      # minimal and has NO /sbin/init — build a systemd-capable image first.
+      # Built with sudo because smoke-full.sh runs under sudo (root podman storage).
+      - name: Build systemd-capable app image
+        run: |
+          sudo podman build -t localhost/duynhlab-smoke-init:latest -f - . <<'EOF'
+          FROM quay.io/centos/centos:stream9
+          RUN dnf -y install systemd && dnf clean all
+          EOF
+
+      - name: Full smoke (systemd + Postgres)
+        working-directory: packages
+        env:
+          APP_IMAGE: localhost/duynhlab-smoke-init:latest
+        run: sudo -E ./scripts/smoke-full.sh
+
+      - name: Dump app journal on failure
+        if: failure()
+        run: |
+          set +e
+          sudo podman ps -a
+          sudo podman logs duynhlab-smoke-app    | tail -300 || true
+          sudo podman logs duynhlab-smoke-db     | tail -100 || true
+          sudo podman exec duynhlab-smoke-app journalctl -xe --no-pager | tail -500 || true

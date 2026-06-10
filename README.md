@@ -153,8 +153,7 @@ packages/
 │   └── rpm/                    spec assets: scriptlets, systemd tmpl, nginx,
 │                              valkey, postgresql, logrotate, secret-tpl, lib
 ├── .github/workflows/
-│   ├── build.yml              build-rpms (PR + push to main)
-│   ├── smoke-test-rpm.yml     full systemd smoke (manual / callable)
+│   ├── build.yml              build-rpms: build + full systemd smoke (PR/main, skips docs)
 │   └── publish-yum-repo.yml   build + publish to gh-pages (after build-rpms)
 └── docs/                      Documentation (see below)
 ```
