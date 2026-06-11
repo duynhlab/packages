@@ -192,6 +192,9 @@ come pre-built from the service repos.
 - **`duynhlab-ctl`'s `yq` comes via `Requires: yq >= 4`** (EPEL ships mikefarah yq ≥4.47 on EL9 —
   historically it was the unrelated python-yq, so re-verify if the floor ever changes). Don't bundle
   a private copy; the ctl resolver prefers `/opt/duynhlab/lib/yq` only as an escape hatch (B6).
+  **Build machines need mikefarah yq too** (`yq_bin()` in `scripts/lib/common.sh` parses
+  `services.yaml` during builds) — the spec's `Requires:` does NOT cover them; CI installs it in
+  `_build-test.yml`, devs install it once. Don't delete `yq_bin()` thinking the spec replaced it.
 - **Frontend `VITE_API_BASE_URL` is baked at build time** — changing the gateway origin requires a
   rebuild.
 - **Never co-locate two services in one database** — golang-migrate's unqualified `schema_migrations`

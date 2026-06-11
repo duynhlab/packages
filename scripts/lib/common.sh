@@ -34,7 +34,15 @@ require_cmd() {
   done
 }
 
-# ── services.yaml parser (uses yq v4) ─────────────────────────────────────────
+# ── services.yaml parser (mikefarah yq v4) ────────────────────────────────────
+# BUILD-TIME dependency — runs on the developer machine / CI runner that BUILDS
+# the RPM. Do not confuse it with the spec's `Requires: yq`, which only applies
+# to CUSTOMER hosts that INSTALL the RPM (it covers duynhlab-ctl at runtime and
+# does nothing for build machines).
+#   CI:  installed by .github/workflows/_build-test.yml (curl from GitHub —
+#        Ubuntu's `apt install yq` is the unrelated python-yq, wrong tool).
+#   Dev: install once: `go install github.com/mikefarah/yq/v4@latest` or grab
+#        the binary from https://github.com/mikefarah/yq/releases.
 yq_bin() {
   if command -v yq >/dev/null 2>&1; then
     echo yq
