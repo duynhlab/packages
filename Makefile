@@ -5,7 +5,7 @@
 # + CLI tools + nginx/valkey/postgresql config templates.
 
 .PHONY: help all fetch-sources build-local build-local-all render-systemd \
-        stage build test-install test-integration publish-repo clean
+        stage build test-install test-integration publish-repo release clean
 
 SERVICE          ?=
 VERSION          ?= $(shell date -u +%Y.%m.%d)
@@ -26,6 +26,7 @@ help:
 	@echo "  test-install               Install dist/*.rpm in Rocky 9 + verify"
 	@echo "  test-integration           Boot platform: podman --systemd=always + Postgres sidecar"
 	@echo "  publish-repo               Stage gh-pages YUM repo (build/gh-pages/)"
+	@echo "  release                    Cut a release: next CalVer tag (vYYYY.MM.DD[.N]) -> push -> CI publishes"
 	@echo "  all                        stage + build + test-install"
 	@echo "  clean                      Remove build/ and dist/"
 	@echo ""
@@ -64,6 +65,25 @@ test-integration:
 
 publish-repo:
 	@bash scripts/publish-yum-repo.sh
+
+# Cut a release. Computes the next free CalVer tag for today (v2026.06.11,
+# then v2026.06.11.1, ...), creates an ANNOTATED tag on main and pushes it —
+# .github/workflows/release.yml does the rest (build, test, publish).
+release:
+	@set -e; \
+	branch=$$(git branch --show-current); \
+	[ "$$branch" = "main" ] || { echo "ERROR: release from main only (on $$branch)"; exit 1; }; \
+	git diff --quiet && git diff --cached --quiet || { echo "ERROR: working tree dirty"; exit 1; }; \
+	git fetch -q --tags origin main; \
+	[ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ] || { echo "ERROR: main not up to date with origin (git pull first)"; exit 1; }; \
+	base="v$$(date -u +%Y.%m.%d)"; tag="$$base"; n=0; \
+	while git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; do \
+	  n=$$((n+1)); tag="$$base.$$n"; \
+	done; \
+	echo "Cutting $$tag from $$(git rev-parse --short HEAD)"; \
+	git tag -a "$$tag" -m "release $$tag"; \
+	git push origin "$$tag"; \
+	echo "Pushed $$tag — follow: gh run watch \$$(gh run list --workflow=release --limit 1 --json databaseId --jq '.[0].databaseId')"
 
 all: stage build test-install
 

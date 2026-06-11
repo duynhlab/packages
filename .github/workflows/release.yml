@@ -1,0 +1,344 @@
+name: release
+
+# Tag-driven release: pushing a CalVer tag (v2026.06.11, second cut of the day
+# v2026.06.11.1 — see `make release`) builds the mega-RPM, runs the full test
+# suite, and publishes — all in ONE run, so the published RPM is byte-identical
+# to the tested one and its NEVR matches the tag. Merges to main do NOT release
+# (build-rpms validates only).
+#
+# workflow_dispatch re-publishes an EXISTING tag idempotently (e.g. repodata
+# refresh after a failed publish step) — it rebuilds + retests from the tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to re-publish (e.g. v2026.06.11)"
+        required: true
+
+permissions:
+  contents: read
+
+# One release at a time — protects the gh-pages force-push and Release list
+# reads (repodata last-3) from interleaving.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DUYNHLAB_SRC_ROOT: ${{ github.workspace }}/src
+  CONTAINER_RUNNER: docker
+  BASE_URL: https://duynhlab.github.io/packages
+
+jobs:
+  guard:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Checkout (full history for ancestry check)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve + validate tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          # CalVer with optional same-day suffix: v2026.06.11 / v2026.06.11.1
+          [[ "$tag" =~ ^v20[0-9]{2}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$ ]] \
+            || { echo "::error::Tag '$tag' is not vYYYY.MM.DD[.N] — use 'make release'"; exit 1; }
+
+          sha=$(git rev-parse "${tag}^{commit}" 2>/dev/null) \
+            || { echo "::error::Tag '$tag' not found"; exit 1; }
+
+          # Only release code that is on main.
+          git merge-base --is-ancestor "$sha" origin/main \
+            || { echo "::error::Tag '$tag' ($sha) is not an ancestor of main — merge first"; exit 1; }
+
+          # A tag push must not silently overwrite an existing release; explicit
+          # re-publish goes through workflow_dispatch.
+          if [[ "${{ github.event_name }}" == "push" ]] \
+             && gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::Release $tag already exists — use workflow_dispatch to re-publish"
+            exit 1
+          fi
+
+          echo "tag=$tag"          >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}"  >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag (version ${tag#v}, commit $sha)"
+
+  build-test:
+    name: Build + test (version = tag)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: guard
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Checkout packages repo at tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.guard.outputs.tag }}
+          path: packages
+
+      - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
+        uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+          check-latest: true
+
+      - name: Set up Node (for frontend)
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext-base curl tar podman uidmap
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Fetch every service source
+        working-directory: packages
+        run: ./scripts/fetch-sources.sh main
+
+      - name: Build all services (version = ${{ needs.guard.outputs.version }})
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          for svc in $(yq '.services[].name' services.yaml); do
+            echo "::group::build-local $svc"
+            ./scripts/build-local.sh "$svc" "$VERSION"
+            echo "::endgroup::"
+          done
+
+      - name: Render systemd units
+        working-directory: packages
+        run: ./scripts/render-systemd.sh
+
+      - name: Stage Source0 tarball (writes the composition manifest)
+        working-directory: packages
+        run: ./scripts/stage-all.sh
+
+      - name: Build mega-RPM
+        working-directory: packages
+        env:
+          BUILD_RUNNER: docker
+        run: ./scripts/build-rpm.sh
+
+      - name: Install test (Rocky 9)
+        working-directory: packages
+        run: ./scripts/test-install.sh
+
+      - name: Build systemd-capable app image
+        run: |
+          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
+          FROM quay.io/centos/centos:stream9
+          RUN dnf -y install systemd && dnf clean all
+          EOF
+
+      - name: Integration test (systemd + Postgres)
+        working-directory: packages
+        env:
+          APP_IMAGE: localhost/duynhlab-test-init:latest
+          KEEP_POD: "1"
+        run: ./scripts/test-integration.sh
+
+      - name: Dump app journal on failure
+        if: failure()
+        run: |
+          set +e
+          podman ps -a
+          podman logs duynhlab-test-app    | tail -300 || true
+          podman logs duynhlab-test-db     | tail -100 || true
+          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true
+
+      - name: Collect release artifact (RPM + manifest)
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          cp build/staging/opt/duynhlab/etc/manifest dist/MANIFEST.txt
+          ls -lh dist/
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: duynhlab-release-${{ needs.guard.outputs.tag }}
+          path: |
+            packages/dist/*.x86_64.rpm
+            packages/dist/MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish (Release + YUM repo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [guard, build-test]
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    env:
+      TAG: ${{ needs.guard.outputs.tag }}
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Checkout packages repo at tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.guard.outputs.tag }}
+          path: packages
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 1
+
+      - name: Download tested artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: duynhlab-release-${{ needs.guard.outputs.tag }}
+          path: packages/dist
+
+      - name: Create GitHub Release (generated notes + manifest)
+        working-directory: packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rpm=$(ls dist/duynhlab-*.x86_64.rpm | head -1)
+
+          # Generated notes (commit/PR history since previous tag) via the API —
+          # deterministic to combine with our own body.
+          gen=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+                  -f tag_name="$TAG" --jq .body || echo "")
+
+          {
+            echo "Mega-RPM for the duynhlab platform (EL9, x86_64)."
+            echo
+            echo '```bash'
+            echo "sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo ${BASE_URL}/duynhlab.repo"
+            echo "sudo dnf install -y duynhlab"
+            echo '```'
+            echo
+            echo "## Composition"
+            echo
+            echo '| Service | Commit |'
+            echo '|---|---|'
+            grep -v '^#' dist/MANIFEST.txt | while read -r svc sha _; do
+              echo "| $svc | \`${sha#sha=}\` |"
+            done
+            echo
+            echo "Full manifest: \`MANIFEST.txt\` asset (also shipped in the RPM at /opt/duynhlab/etc/manifest)."
+            echo
+            echo "$gen"
+          } > notes.md
+
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            # Idempotent re-publish (workflow_dispatch path)
+            gh release upload "$TAG" "$rpm" dist/MANIFEST.txt \
+              --repo "${{ github.repository }}" --clobber
+            gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md
+          else
+            gh release create "$TAG" "$rpm" dist/MANIFEST.txt \
+              --repo "${{ github.repository }}" \
+              --verify-tag \
+              --title "duynhlab ${VERSION}" \
+              --notes-file notes.md
+          fi
+
+      - name: Assemble multi-version RPM tree (current + 2 previous releases)
+        working-directory: packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tree="${{ github.workspace }}/rpm-tree"
+          rm -rf "$tree"; mkdir -p "$tree/$TAG"
+          cp dist/duynhlab-*.x86_64.rpm "$tree/$TAG/"
+
+          # Previous (non-draft) CalVer releases, newest first, excluding this tag.
+          prev=$(gh release list --repo "${{ github.repository }}" --limit 20 \
+                   --json tagName,isDraft \
+                   --jq '.[] | select(.isDraft|not) | .tagName' \
+                 | grep -E '^v20[0-9]{2}\.' | grep -vx "$TAG" | head -2 || true)
+          for t in $prev; do
+            echo "including previous release $t"
+            mkdir -p "$tree/$t"
+            gh release download "$t" --repo "${{ github.repository }}" \
+              --pattern 'duynhlab-*.x86_64.rpm' --dir "$tree/$t" \
+              || { echo "::warning::no RPM asset on $t — skipping"; rmdir "$tree/$t"; }
+          done
+          find "$tree" -name '*.rpm' | sort
+
+      - name: Stage YUM repo (repodata indexes up to 3 versions)
+        working-directory: packages
+        env:
+          REPO_OUT: ${{ github.workspace }}/gh-pages
+          RPM_TREE: ${{ github.workspace }}/rpm-tree
+          RELEASE_BASE_URL: https://github.com/${{ github.repository }}/releases/download/
+        run: ./scripts/publish-yum-repo.sh
+
+      - name: Commit + push gh-pages (orphan, metadata only)
+        working-directory: gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "duynebot"
+          git config user.email "duynebot@users.noreply.github.com"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git checkout --orphan publish
+          git add -A
+          git commit -m "publish ${TAG}: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+          git branch -M publish gh-pages
+          git push -f origin gh-pages
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: gh-pages
+          include-hidden-files: true
+
+      - name: Print final URLs
+        run: |
+          echo "Release:    https://github.com/${{ github.repository }}/releases/tag/${TAG}"
+          echo "Repo:       $BASE_URL"
+          echo ".repo file: $BASE_URL/duynhlab.repo"
+          echo "Metadata:   $BASE_URL/rpm/el9/x86_64/repodata/"
+
+  deploy:
+    name: Deploy gh-pages tree to GitHub Pages
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

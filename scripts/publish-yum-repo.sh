@@ -37,11 +37,27 @@ PAGES_HOST="${PAGES_HOST:-duynhlab.github.io}"
 # tree) so `make publish-repo` still produces a self-contained, servable repo.
 RELEASE_BASE_URL="${RELEASE_BASE_URL:-}"
 
-shopt -s nullglob
-rpms=( "$RPM_SRC"/*.x86_64.rpm "$RPM_SRC"/*.noarch.rpm )
-[[ ${#rpms[@]} -gt 0 ]] || die "No RPMs in $RPM_SRC — run scripts/build-rpm.sh first"
+# RPM_TREE — multi-version release mode. A directory of per-tag subdirs, e.g.
+#   $RPM_TREE/v2026.06.10/duynhlab-2026.06.10-1.el9.x86_64.rpm
+#   $RPM_TREE/v2026.06.11/duynhlab-2026.06.11-1.el9.x86_64.rpm
+# The tree is indexed as-is: createrepo_c preserves the relative paths, so with
+#   RELEASE_BASE_URL=https://github.com/<owner>/<repo>/releases/download/
+# every <location href> resolves to that version's own Release asset. This lets
+# the repodata index several versions at once (dnf downgrade works). Requires
+# RELEASE_BASE_URL. Mutually exclusive with the flat RPM_SRC model.
+RPM_TREE="${RPM_TREE:-}"
 
-log_info "RPM_SRC=$RPM_SRC  (${#rpms[@]} files)"
+shopt -s nullglob
+if [[ -n "$RPM_TREE" ]]; then
+  [[ -n "$RELEASE_BASE_URL" ]] || die "RPM_TREE requires RELEASE_BASE_URL (release-assets root)"
+  rpms=( "$RPM_TREE"/*/*.x86_64.rpm "$RPM_TREE"/*/*.noarch.rpm )
+  [[ ${#rpms[@]} -gt 0 ]] || die "No RPMs under $RPM_TREE/<tag>/"
+  log_info "RPM_TREE=$RPM_TREE  (${#rpms[@]} files across $(ls -1 "$RPM_TREE" | wc -l) version dirs)"
+else
+  rpms=( "$RPM_SRC"/*.x86_64.rpm "$RPM_SRC"/*.noarch.rpm )
+  [[ ${#rpms[@]} -gt 0 ]] || die "No RPMs in $RPM_SRC — run scripts/build-rpm.sh first"
+  log_info "RPM_SRC=$RPM_SRC  (${#rpms[@]} files)"
+fi
 log_info "REPO_OUT=$REPO_OUT"
 
 # createrepo_c always runs over a self-contained input dir holding the RPMs.
@@ -58,9 +74,14 @@ else
   log_info "LOCAL mode — RPMs copied into $CR_INPUT"
 fi
 
-for r in "${rpms[@]}"; do
-  cp -f "$r" "$CR_INPUT/"
-done
+if [[ -n "$RPM_TREE" ]]; then
+  # Preserve the v<tag>/ subdirs — they become the relative part of each href.
+  cp -a "$RPM_TREE/." "$CR_INPUT/"
+else
+  for r in "${rpms[@]}"; do
+    cp -f "$r" "$CR_INPUT/"
+  done
+fi
 log_ok "staged ${#rpms[@]} RPM(s) into $CR_INPUT"
 
 # SRPMs are intentionally NOT published: the .src.rpm exceeds GitHub's 100 MB
@@ -128,8 +149,11 @@ fi
 
 log_ok "repodata generated: $REPO_OUT/$ARCH_DIR/repodata/repomd.xml"
 
-# Link used on the landing page's "Browse" list.
-if [[ -n "$RELEASE_BASE_URL" ]]; then
+# Link used on the landing page's "Browse" list. In tree mode RELEASE_BASE_URL
+# is the bare releases/download/ root (not browsable) — link the Releases page.
+if [[ -n "$RPM_TREE" ]]; then
+  RELEASE_LINK="${RELEASE_BASE_URL%releases/download/}releases"
+elif [[ -n "$RELEASE_BASE_URL" ]]; then
   RELEASE_LINK="$RELEASE_BASE_URL"
 else
   RELEASE_LINK="rpm/el9/x86_64/"
