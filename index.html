@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>duynhlab packages</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#222}code,pre{background:#f4f4f4;padding:2px 6px;border-radius:4px}pre{padding:12px;overflow:auto}</style>
+<h1>duynhlab packages</h1>
+<p>YUM repository for the <strong>duynhlab</strong> e-commerce platform.
+Hosted on GitHub Pages, backed by the
+<a href="https://github.com/duynhlab/packages">duynhlab/packages</a> repository.</p>
+
+<h2>Install (Rocky / Alma / RHEL 9)</h2>
+<pre>sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo https://duynhlab.github.io/packages/duynhlab.repo
+sudo dnf install -y duynhlab</pre>
+
+<h2>Bootstrap</h2>
+<pre>SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \
+  sudo -E duynhlab-db-setup bootstrap
+sudo duynhlab-db-setup migrate
+sudo systemctl enable --now duynhlab-platform.target</pre>
+
+<h2>Browse</h2>
+<ul>
+  <li><a href="https://github.com/duynhlab/packages/releases">RPM downloads (GitHub Releases)</a></li>
+  <li><a href="rpm/el9/x86_64/repodata/">rpm/el9/x86_64/repodata/</a> (metadata)</li>
+  <li><a href="duynhlab.repo">duynhlab.repo</a></li>
+</ul>
