@@ -200,6 +200,10 @@ jobs:
     env:
       TAG: ${{ needs.guard.outputs.tag }}
       VERSION: ${{ needs.guard.outputs.version }}
+      # Force docker for createrepo_c: the runner's preinstalled podman is
+      # rootless, and the in-container chown maps to a subuid the runner user
+      # can't clean up afterwards (run 27297…: rm Permission denied).
+      CREATEREPO_RUNNER: docker
     steps:
       - name: Checkout packages repo at tag
         uses: actions/checkout@v6
