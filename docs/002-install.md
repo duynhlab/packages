@@ -202,5 +202,5 @@ sudo dnf install duynhlab
 ```
 
 See also: [`docs/README.md`](README.md) for the full documentation index —
-in particular [`build.md`](build.md) for the publish flow and
-[`operations.md`](operations.md) for day-2 operations.
+in particular [`004-build.md`](004-build.md) for the publish flow and
+[`003-operations.md`](003-operations.md) for day-2 operations.

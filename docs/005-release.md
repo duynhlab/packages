@@ -2,7 +2,7 @@
 
 Operational guide for cutting, re-publishing, rolling back, and auditing
 releases. Pipeline internals (scripts, workflows, hosting rationale):
-[`build.md`](build.md) § 5.
+[`004-build.md`](004-build.md) § 5.
 
 ## 1. Flow at a glance
 
@@ -85,7 +85,7 @@ Older than that: download from the
 > ⚠️ Migrations are **forward-only** — downgrading the package does not
 > downgrade the schema. Only downgrade across versions with the same
 > `SCHEMA_VERSION` (check the release notes / manifest), or restore the DB from
-> a pre-upgrade backup. See [`install.md`](install.md) § Downgrade.
+> a pre-upgrade backup. See [`002-install.md`](002-install.md) § Downgrade.
 
 ## 6. Audit a release
 
