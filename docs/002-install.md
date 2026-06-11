@@ -175,6 +175,11 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;" ...
 
 ## Troubleshooting
 
+When contacting support, attach a diagnostics bundle —
+`sudo duynhlab-ctl support-bundle` collects journals, unit status, versions and
+non-secret configs into one tarball (**your `*.env` secrets are never
+included**).
+
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `dnf install` fails: `Curl error (60): SSL certificate problem` | Mirror reach is restricted | `dnf install --setopt=sslverify=false` once, then fix CA |

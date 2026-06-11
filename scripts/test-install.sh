@@ -102,6 +102,38 @@ duynhlab-ctl list
 duynhlab-ctl ports
 echo "::endgroup::"
 
+echo "::group::secret versioning — re-running the generator must change nothing"
+grep -q "^secretVersion=1$" /etc/duynhlab/secret_version.properties \
+  || { echo "BAD secret_version.properties"; exit 1; }
+stat -c '%a' /etc/duynhlab/secret_version.properties | grep -qx 640 \
+  || { echo "secret_version.properties not 0640"; exit 1; }
+before=$(sha256sum /etc/duynhlab/*.env | sha256sum)
+/opt/duynhlab/lib/password-generator.sh
+after=$(sha256sum /etc/duynhlab/*.env | sha256sum)
+[ "$before" = "$after" ] || { echo "GENERATOR NOT IDEMPOTENT — env files changed"; exit 1; }
+echo "idempotent OK"
+echo "::endgroup::"
+
+echo "::group::install history log"
+grep -q "installed on" /var/log/duynhlab/version.log \
+  || { echo "MISSING version.log entry"; exit 1; }
+cat /var/log/duynhlab/version.log
+echo "::endgroup::"
+
+echo "::group::support-bundle contains NO secrets"
+duynhlab-ctl support-bundle /tmp
+bundle=$(ls /tmp/duynhlab-support-*.tar.gz | head -1)
+[ -f "$bundle" ] || { echo "NO bundle produced"; exit 1; }
+# Take a real password value and prove it is absent from the bundle.
+pass=$(grep -m1 '^DB_PASSWORD=' /etc/duynhlab/auth.env | cut -d= -f2)
+mkdir -p /tmp/bundle-x && tar -xzf "$bundle" -C /tmp/bundle-x
+if grep -r -q "$pass" /tmp/bundle-x; then
+  echo "SECRET LEAKED INTO SUPPORT BUNDLE"; exit 1
+fi
+ls /tmp/bundle-x/*/ | head -10
+echo "no secrets in bundle OK"
+echo "::endgroup::"
+
 echo "::group::systemd units"
 ls /usr/lib/systemd/system/duynhlab-*.{service,target}
 expected_services="auth user product cart order review notification shipping"

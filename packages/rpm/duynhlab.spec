@@ -138,12 +138,18 @@ if [ -x %{duynhlab_prefix}/lib/init-service.sh ]; then
   %{duynhlab_prefix}/lib/init-service.sh || :
 fi
 
-# 2. On first install only: generate env files with random passwords.
-if [ $1 -eq 1 ]; then
-  if [ -x %{duynhlab_prefix}/lib/password-generator.sh ]; then
-    %{duynhlab_prefix}/lib/password-generator.sh || :
-  fi
+# 2. Generate/upgrade env files. Runs on EVERY install AND upgrade: the
+# generator is versioned via /etc/duynhlab/secret_version.properties, so a
+# release that introduces a new secret applies only its own incremental block
+# — existing env files and passwords are never touched.
+if [ -x %{duynhlab_prefix}/lib/password-generator.sh ]; then
+  %{duynhlab_prefix}/lib/password-generator.sh || :
 fi
+
+# 2b. Append to the install history (support: "what versions ran on this box?").
+mkdir -p %{duynhlab_log}
+echo "%{version}-%{release} installed on $(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ) (op=$1)" \
+  >> %{duynhlab_log}/version.log
 
 # 3. systemd_post for every shipped unit.
 %systemd_post duynhlab-platform.target
@@ -272,4 +278,3 @@ exit 0
 * Sun May 24 2026 duynhlab ops <ops@duynhlab.io> - 2026.05.20-1
 - Initial mega-RPM release (Option A monorepo SPEC).
 - 8 backend services + frontend + common CLI in a single package.
-- Inspired by Opswat MOCM packaging pattern.

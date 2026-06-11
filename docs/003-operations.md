@@ -29,6 +29,7 @@ duynhlab-ctl <command> [svc|all] [args]
 | `version` | `duynhlab-ctl version all` | Print binary + schema versions |
 | `config` | `duynhlab-ctl config auth` | Show env file (password masked) |
 | `ports` | `duynhlab-ctl ports` | Port assignment table |
+| `support-bundle` | `duynhlab-ctl support-bundle [dir]` | Diagnostics tarball for support: 7 days of journals, unit status, manifest, versions, install history, non-secret configs. **`*.env` / `*.override` are never included** |
 
 `svc` accepts a single name or `all`. Health/version iterate every service.
 
