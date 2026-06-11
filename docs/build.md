@@ -38,7 +38,7 @@ All scripts live in [`scripts/`](../scripts) and source
 | `fetch-sources.sh [ref]` | `services.yaml` | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` every service repo at `ref` (default `main`) |
 | `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/*.tar.gz` + `.sha256` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; tar binary + migrations |
 | `render-systemd.sh [outdir]` | `services.yaml` + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
-| `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree → Source0 tarball |
+| `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree + generate the composition manifest (`etc/manifest`) → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba specs/duynhlab.spec` |
 | `publish-yum-repo.sh` | `dist/*.x86_64.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
 
@@ -89,6 +89,7 @@ make build                    # stage + rpmbuild -> dist/
 make test-install             # file-level install check
 make test-integration         # full systemd boot + health (podman + Postgres)
 make publish-repo             # stage gh-pages YUM tree
+make release                  # cut a release: next CalVer tag -> push -> release.yml
 make all                      # stage + build + test-install
 make clean                    # rm build/ dist/
 ```

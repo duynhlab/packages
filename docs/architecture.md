@@ -55,7 +55,7 @@ flowchart TB
 | cart | 8004 | `duynhlab_cart` | — |
 | order | 8005 | `duynhlab_order` | — |
 | review | 8006 | `duynhlab_review` | — |
-| notification | 8007 | `duynhlab_notification` | `valkey`/`redis` |
+| notification | 8007 | `duynhlab_notification` | — |
 | shipping | 8008 | `duynhlab_shipping` | — |
 | frontend | — | — | static, served by nginx |
 
@@ -76,7 +76,9 @@ flowchart TB
 ├── logrotate/ secret-tpl/
 └── etc/
     ├── services.yaml               Runtime copy read by CLI tools
-    └── env-global.properties       Shared env (DB host, etc.)
+    ├── env-global.properties       Shared env (DB host, etc.)
+    └── manifest                    Composition: the 9 service commits this
+                                    build was made from (audit / release notes)
 
 /etc/duynhlab/                      Mutable state (NOT overwritten on upgrade)
 ├── env-global.properties           Global overrides

@@ -70,7 +70,8 @@ packages/
     └── lib/                   init-service.sh, password-generator.sh
 specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          architecture.md, build.md, operations.md, install.md
-.github/workflows/             build.yml (validate: build + test-integration), release.yml (tag-driven publish)
+.github/workflows/             _build-test.yml (reusable pipeline), build.yml (validate — calls it),
+                               release.yml (tag-driven publish — calls it too)
 build/  dist/                  Generated, gitignored — never hand-edit
 plan-spec.md                   Internal roadmap + decisions + backlog (gitignored)
 ```
@@ -100,7 +101,9 @@ Three stages, all driven by `services.yaml`:
    + `build-info.env` (carries `SCHEMA_VERSION` = highest embedded migration, audit-only).
 2. **`stage-all.sh`** — extract every backend tarball + frontend dist into
    `build/staging/opt/duynhlab/`, write `BINARY_VERSION`/`SCHEMA_VERSION`, copy CLI tools + config
-   templates, run `render-systemd.sh`, then tar everything as the Source0 staging tarball.
+   templates, generate the **composition manifest** (`etc/manifest` — the 9 service SHAs, used by
+   release notes and shipped in the RPM), run `render-systemd.sh`, then tar everything as the
+   Source0 staging tarball.
 3. **`build-rpm.sh`** — `rpmbuild -ba specs/duynhlab.spec` (host, else podman/rockylinux:9, else
    docker) → `dist/duynhlab-<VERSION>-1.el9.x86_64.rpm`.
 
@@ -117,6 +120,7 @@ make build                      # stage + rpmbuild -> dist/
 make test-install               # file-level install check (Rocky 9 container)
 make test-integration           # full systemd boot + health (podman + Postgres sidecar)
 make publish-repo               # stage gh-pages YUM tree
+make release                    # cut a release: next CalVer tag -> push -> release.yml publishes
 make clean                      # rm build/ dist/
 ```
 

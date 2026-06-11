@@ -8,7 +8,8 @@ databases, and troubleshooting. All commands assume `root` (or `sudo`).
 ## 1. `duynhlab-ctl` — service control
 
 A thin, safe wrapper around `systemctl`/`journalctl` that knows the service
-list from `/etc/duynhlab/services.yaml`.
+list from `/etc/duynhlab/services.yaml` (parsed with mikefarah `yq`, which the
+RPM pulls automatically via `Requires: yq` — no manual install needed).
 
 ```
 duynhlab-ctl <command> [svc|all] [args]
@@ -120,9 +121,10 @@ done
 systemctl restart duynhlab-platform.target
 ```
 
-Upgrades preserve `/etc/duynhlab/*.env` and the database. A backend refuses to
-start if its binary expects a newer schema than is applied — run `migrate`
-first.
+Upgrades preserve `/etc/duynhlab/*.env` and the database. Nothing blocks a
+backend from starting against an outdated schema (`SCHEMA_VERSION` is audit
+metadata only) — a binary running ahead of its migrations fails at runtime
+with SQL errors, so always run `migrate` before restarting.
 
 ## 7. Remove
 
@@ -145,7 +147,7 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;"   # … per service
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `duynhlab-ctl status` shows `inactive (dead)` | DB unreachable / wrong password | `duynhlab-ctl config <svc>`, verify with `psql` |
-| Service fails: "schema version mismatch" | Forgot `migrate` after upgrade | `duynhlab-db-setup migrate <svc>`, restart |
+| Service logs SQL errors (missing table/column) after upgrade | Forgot `migrate` | `duynhlab-db-setup migrate <svc>`, restart |
 | `nginx -t` fails after install | Existing `server { listen 80; }` in `nginx.conf` | Remove the default server block; ours is in `conf.d/duynhlab.conf` |
 | `health` reports connection refused | Service not started or wrong port | `duynhlab-ctl start <svc>`; check `duynhlab-ctl ports` |
 | `db-setup bootstrap` errors `SUPERUSER_DSN` | Env var not exported | `export SUPERUSER_DSN=postgresql://postgres:…` |
