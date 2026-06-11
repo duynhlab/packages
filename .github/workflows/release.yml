@@ -339,6 +339,11 @@ jobs:
     name: Deploy gh-pages tree to GitHub Pages
     needs: publish
     runs-on: ubuntu-latest
+    # Top-level permissions are contents:read — deploy-pages needs its own
+    # elevation (OIDC token), it does NOT inherit from the publish job.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
