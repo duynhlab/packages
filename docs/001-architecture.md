@@ -199,4 +199,4 @@ flowchart LR
   role against the direct DB host. Forward-only; no separate migrate tool, no
   loose SQL.
 
-See [operations.md](operations.md) for the commands.
+See [operations.md](003-operations.md) for the commands.

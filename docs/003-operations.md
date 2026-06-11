@@ -153,5 +153,5 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;"   # … per service
 | `db-setup bootstrap` errors `SUPERUSER_DSN` | Env var not exported | `export SUPERUSER_DSN=postgresql://postgres:…` |
 | `db-setup` errors `DB_PASSWORD empty` | Env file not generated | Reinstall, or run `duynhlab-gen-password` |
 
-See [install.md](install.md) for first-time setup and [architecture.md](architecture.md)
+See [install.md](002-install.md) for first-time setup and [architecture.md](001-architecture.md)
 for the systemd/DB model.

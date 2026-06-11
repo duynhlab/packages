@@ -212,7 +212,7 @@ sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo $BASE_URL/duynhlab.repo
 sudo dnf install -y duynhlab
 \`\`\`
 
-See [\`docs/install.md\`](https://github.com/duynhlab/packages/blob/main/docs/install.md)
+See [\`docs/002-install.md\`](https://github.com/duynhlab/packages/blob/main/docs/002-install.md)
 for the full guide.
 EOF
 

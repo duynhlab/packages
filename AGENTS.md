@@ -69,7 +69,7 @@ packages/
     ├── nginx/ valkey/ postgresql/ logrotate/   config templates
     └── lib/                   init-service.sh, password-generator.sh
 specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
-docs/                          architecture.md, build.md, operations.md, install.md
+docs/                          numbered reading order: 001-architecture … 006-add-service (see docs/README.md)
 .github/workflows/             _build-test.yml (reusable pipeline), build.yml (validate — calls it),
                                release.yml (tag-driven publish — calls it too)
 build/  dist/                  Generated, gitignored — never hand-edit

@@ -22,7 +22,7 @@ sudo dnf install -y duynhlab
 
 Then bootstrap the per-service databases and start the platform — full steps
 (prerequisites, per-service `duynhlab-db-setup bootstrap`/`migrate`, verify,
-upgrade, remove): [`docs/install.md`](docs/install.md).
+upgrade, remove): [`docs/002-install.md`](docs/002-install.md).
 
 ### Build locally (maintainer)
 
@@ -34,7 +34,7 @@ make test-install           # file-level install check in Rocky 9
 ```
 
 `BUILD_RUNNER=host|podman|docker` is auto-detected. Full pipeline, scripts, and
-Makefile reference: [`docs/build.md`](docs/build.md).
+Makefile reference: [`docs/004-build.md`](docs/004-build.md).
 
 ## CI in one paragraph
 
@@ -49,15 +49,16 @@ with the tag as its version, runs the same tests on that exact RPM, then uploads
 it to a GitHub Release (notes auto-generated + a manifest of the 9 service
 commits) and refreshes the YUM metadata on Pages — indexing the **last 3
 releases**, so `dnf downgrade duynhlab` works. Details + rationale:
-[`docs/build.md`](docs/build.md) § CI workflows.
+[`docs/004-build.md`](docs/004-build.md) § CI workflows.
 
 ## Documentation
 
 | Doc | Contents |
 |---|---|
-| [`docs/install.md`](docs/install.md) | End-user install, bootstrap, upgrade, remove, troubleshooting |
-| [`docs/architecture.md`](docs/architecture.md) | What ships in the package, FHS layout, systemd model, lifecycle |
-| [`docs/build.md`](docs/build.md) | Build pipeline, scripts, Makefile, CI workflows, publishing |
-| [`docs/operations.md`](docs/operations.md) | `duynhlab-ctl`, `duynhlab-db-setup`, systemd targets, day-2 ops |
-| [`docs/release.md`](docs/release.md) | Release runbook: cut, same-day hotfix, re-publish, rollback, audit |
+| [`docs/001-architecture.md`](docs/001-architecture.md) | What ships in the package, FHS layout, systemd model, lifecycle |
+| [`docs/002-install.md`](docs/002-install.md) | End-user install, bootstrap, upgrade, downgrade, remove, troubleshooting |
+| [`docs/003-operations.md`](docs/003-operations.md) | `duynhlab-ctl`, `duynhlab-db-setup`, systemd targets, day-2 ops |
+| [`docs/004-build.md`](docs/004-build.md) | Build pipeline, scripts, Makefile, CI workflows, publishing |
+| [`docs/005-release.md`](docs/005-release.md) | Release runbook: cut, same-day hotfix, re-publish, rollback, audit |
+| [`docs/006-add-service.md`](docs/006-add-service.md) | Onboarding a new service: prerequisites, registry entry, touch-point checklist |
 | [`AGENTS.md`](AGENTS.md) | Repository layout, conventions, contributor/agent guide |
