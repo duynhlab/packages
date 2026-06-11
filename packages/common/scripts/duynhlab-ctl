@@ -14,6 +14,7 @@
 #   version  <svc|all>          Print binary + schema versions
 #   config   <svc>              cat env file (masked password)
 #   ports    [filter]           Show port assignments
+#   support-bundle [dir]        Collect logs+configs for support (NO secrets)
 set -euo pipefail
 
 PROG=${0##*/}
@@ -110,6 +111,54 @@ cmd_config() {
   sed 's/\(DB_PASSWORD=\).*/\1********/' "$f"
 }
 
+# Collect a diagnostics tarball for support. SECRETS ARE NEVER INCLUDED:
+# <svc>.env and <svc>.override are excluded wholesale (they carry DB passwords).
+cmd_support_bundle() {
+  require_yq
+  local outdir=${1:-/tmp}
+  local version stamp work name
+  version=$(sed -n 's/^DUYNHLAB_VERSION=//p' "$ETC_BASE/env-global.properties" 2>/dev/null | head -1)
+  [ -n "$version" ] || version=unknown
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  name="duynhlab-support-${version}-${stamp}"
+  work=$(mktemp -d)
+  # Expand $work NOW — a deferred '$work' would be out of scope (set -u) at exit.
+  trap "rm -rf '$work'" EXIT
+  mkdir -p "$work/$name"/{journal,etc,opt}
+
+  echo "Collecting (secrets are NOT included)..."
+  # Per-service journal (last 7 days) + unit status.
+  while read -r svc; do
+    journalctl -u "duynhlab-$svc" --since '7 days ago' --no-pager \
+      > "$work/$name/journal/duynhlab-$svc.log" 2>&1 || :
+    systemctl status "duynhlab-$svc" --no-pager \
+      > "$work/$name/journal/duynhlab-$svc.status" 2>&1 || :
+  done < <(list_services)
+
+  # Platform state.
+  { cmd_list; echo; cmd_ports ""; } > "$work/$name/platform-state.txt" 2>&1 || :
+  systemctl list-units 'duynhlab-*' --all --no-pager \
+    > "$work/$name/units.txt" 2>&1 || :
+
+  # Versions + composition (no secrets in any of these).
+  cp -f "$OPT_BASE/etc/manifest"        "$work/$name/opt/manifest"        2>/dev/null || :
+  cp -f /var/log/duynhlab/version.log   "$work/$name/install-history.log" 2>/dev/null || :
+  for d in "$OPT_BASE"/*/BINARY_VERSION; do
+    [ -f "$d" ] || continue
+    printf '%s: %s\n' "$(basename "$(dirname "$d")")" "$(cat "$d")"
+  done > "$work/$name/opt/binary-versions.txt" 2>/dev/null || :
+
+  # Non-secret configs only. .env/.override are deliberately skipped.
+  cp -f "$ETC_BASE/services.yaml"          "$work/$name/etc/" 2>/dev/null || :
+  cp -f "$ETC_BASE/env-global.properties"  "$work/$name/etc/" 2>/dev/null || :
+  cp -f /etc/nginx/conf.d/duynhlab.conf    "$work/$name/etc/" 2>/dev/null || :
+
+  local out="$outdir/$name.tar.gz"
+  tar -C "$work" -czf "$out" "$name"
+  echo "${C_GRN}Support bundle: $out${C_RST}"
+  echo "Secrets (*.env, *.override) are NOT included. Attach this file to your support request."
+}
+
 cmd_ports() {
   require_yq
   local filter=${1:-}
@@ -119,7 +168,7 @@ cmd_ports() {
 }
 
 usage() {
-  sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -139,6 +188,7 @@ case "$CMD" in
   config)             [[ $# -ge 1 ]] || die "usage: $PROG config <svc>"
                       cmd_config "$1" ;;
   ports)              cmd_ports "${1:-}" ;;
+  support-bundle)     cmd_support_bundle "${1:-/tmp}" ;;
   -h|--help|help)     usage ;;
   *)                  die "Unknown command: $CMD (try '$PROG help')" ;;
 esac

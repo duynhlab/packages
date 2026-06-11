@@ -3,7 +3,7 @@ _duynhlab_ctl() {
   local cur prev words cword
   _init_completion || return
 
-  local cmds="list start stop restart enable disable status logs health version config ports help"
+  local cmds="list start stop restart enable disable status logs health version config ports support-bundle help"
   if [[ $cword -eq 1 ]]; then
     COMPREPLY=( $(compgen -W "$cmds" -- "$cur") )
     return
