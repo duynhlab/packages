@@ -1,5 +1,9 @@
 name: build-rpms
 
+# VALIDATION only — never publishes. Releases are cut by pushing a CalVer tag
+# (`make release`) → .github/workflows/release.yml. The actual pipeline lives
+# in the reusable _build-test.yml (shared with release.yml).
+
 on:
   push:
     branches: [main]
@@ -21,151 +25,13 @@ on:
 permissions:
   contents: read
 
-env:
-  DUYNHLAB_SRC_ROOT: ${{ github.workspace }}/src
-  CONTAINER_RUNNER: docker
-
 jobs:
-  build:
-    name: Build & install-test all RPMs
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout packages repo
-        uses: actions/checkout@v6
-        with:
-          path: packages
-
-      - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
-          check-latest: true
-
-      - name: Set up Node (for frontend)
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-
-      - name: Install host tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gettext-base curl tar
-          # mikefarah yq v4
-          sudo curl -fsSL -o /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          yq --version
-
-      - name: Fetch every service source
-        working-directory: packages
-        env:
-          DUYNHLAB_SRC_ROOT: ${{ env.DUYNHLAB_SRC_ROOT }}
-        run: ./scripts/fetch-sources.sh "${{ github.event.inputs.ref || 'main' }}"
-
-      - name: Build all services locally (binaries + frontend dist)
-        working-directory: packages
-        env:
-          DUYNHLAB_SRC_ROOT: ${{ env.DUYNHLAB_SRC_ROOT }}
-        run: |
-          set -euo pipefail
-          for svc in $(yq '.services[].name' services.yaml); do
-            echo "::group::build-local $svc"
-            ./scripts/build-local.sh "$svc"
-            echo "::endgroup::"
-          done
-
-      - name: Render systemd units
-        working-directory: packages
-        run: ./scripts/render-systemd.sh
-
-      - name: Stage Source0 tarball
-        working-directory: packages
-        run: ./scripts/stage-all.sh
-
-      - name: Build mega-RPM (rpmbuild in container)
-        working-directory: packages
-        env:
-          BUILD_RUNNER: docker
-        run: ./scripts/build-rpm.sh
-
-      - name: List artefacts
-        working-directory: packages
-        run: ls -lh dist/
-
-      - name: Install test (Rocky 9)
-        working-directory: packages
-        env:
-          CONTAINER_RUNNER: docker
-        run: ./scripts/test-install.sh
-
-      - name: Upload RPM artefacts
-        if: success() || failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: duynhlab-rpms
-          path: packages/dist/*.rpm
-          if-no-files-found: error
-          retention-days: 14
-
-  # Integration test: full systemd + Postgres. Reuses the RPM artifact from `build` — no rebuild.
-  # Runs on main pushes + manual dispatch only (PRs already get the file-level install test
-  # above). This workflow VALIDATES only — nothing here publishes. Releases are
-  # cut by pushing a CalVer tag (`make release`) → .github/workflows/release.yml.
-  test-integration:
-    name: Integration test (systemd + Postgres)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: build
-    if: github.event_name != 'pull_request'
-
-    steps:
-      - name: Checkout packages repo
-        uses: actions/checkout@v6
-        with:
-          path: packages
-
-      - name: Download RPM artifact from build job
-        uses: actions/download-artifact@v8
-        with:
-          name: duynhlab-rpms
-          path: packages/dist
-
-      - name: Install podman
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq podman uidmap
-          podman --version
-
-      # test-integration.sh boots a systemd container; the default centos:stream9 image is
-      # minimal and has NO /sbin/init — build a systemd-capable image first.
-      # Everything runs ROOTLESS: root podman + systemd-in-container breaks on the
-      # ubuntu runners ("systemd did not start", run 27274677129), while the rootless
-      # path is the one validated end-to-end. Same user for build + run = same storage.
-      - name: Build systemd-capable app image
-        run: |
-          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
-          FROM quay.io/centos/centos:stream9
-          RUN dnf -y install systemd && dnf clean all
-          EOF
-
-      # KEEP_POD=1: test-integration.sh's cleanup trap would otherwise remove the pod on
-      # failure, leaving the journal-dump step below with nothing to inspect. The
-      # runner is ephemeral, so skipping cleanup is free.
-      - name: Integration test
-        working-directory: packages
-        env:
-          APP_IMAGE: localhost/duynhlab-test-init:latest
-          KEEP_POD: "1"
-        run: ./scripts/test-integration.sh
-
-      - name: Dump app journal on failure
-        if: failure()
-        run: |
-          set +e
-          podman ps -a
-          podman logs duynhlab-test-app    | tail -300 || true
-          podman logs duynhlab-test-db     | tail -100 || true
-          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true
+  build-test:
+    name: build-test
+    uses: ./.github/workflows/_build-test.yml
+    with:
+      artifact-name: duynhlab-rpms
+      # PRs keep the fast path (file-level install test only); main pushes and
+      # manual dispatches also get the full systemd + Postgres integration test.
+      run-integration: ${{ github.event_name != 'pull_request' }}
+      services-ref: ${{ github.event.inputs.ref || 'main' }}

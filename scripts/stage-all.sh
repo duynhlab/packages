@@ -92,6 +92,8 @@ install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhlab-ctl.bash-completion
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/init-service.sh"               "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/password-generator.sh"         "$OPT/lib/"
 log_ok "staged CLI + lib"
+# NOTE: duynhlab-ctl's yq comes via `Requires: yq` in the spec (EPEL ships
+# mikefarah yq ≥4.47 on EL9) — nothing to bundle here.
 
 # ── 4. Config templates ───────────────────────────────────────────────────────
 cp -a "$REPO_ROOT/packages/rpm/nginx/."      "$OPT/nginx/"

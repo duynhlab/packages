@@ -153,6 +153,9 @@ make release        # computes next free tag (v2026.06.11 → v2026.06.11.1 …)
                     # creates an ANNOTATED tag, pushes it; release.yml does the rest
 ```
 
+Full operational runbook (same-day hotfix, re-publishing a tag, rollback,
+auditing a release's composition): [`release.md`](release.md).
+
 > **Critical ordering**: `stage-all.sh` must run before `build-rpm.sh` — the
 > spec's `Source0` is the staging tarball. Every build workflow includes that
 > step.

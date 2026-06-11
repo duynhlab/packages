@@ -57,4 +57,5 @@ releases**, so `dnf downgrade duynhlab` works. Details + rationale:
 | [`docs/architecture.md`](docs/architecture.md) | What ships in the package, FHS layout, systemd model, lifecycle |
 | [`docs/build.md`](docs/build.md) | Build pipeline, scripts, Makefile, CI workflows, publishing |
 | [`docs/operations.md`](docs/operations.md) | `duynhlab-ctl`, `duynhlab-db-setup`, systemd targets, day-2 ops |
+| [`docs/release.md`](docs/release.md) | Release runbook: cut, same-day hotfix, re-publish, rollback, audit |
 | [`AGENTS.md`](AGENTS.md) | Repository layout, conventions, contributor/agent guide |

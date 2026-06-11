@@ -13,6 +13,7 @@ pick the guide that matches your task.
 | [`install.md`](install.md) | Operators installing the RPM | Add the repo, install, bootstrap the database, start, upgrade, remove, troubleshooting |
 | [`architecture.md`](architecture.md) | Anyone | Why a mega-RPM, component map, services table, FHS layout, systemd model, install/upgrade/remove lifecycle diagrams, database model |
 | [`build.md`](build.md) | Contributors / release engineers | Build pipeline, scripts, runner auto-detection, Makefile targets, CI workflows, gh-pages publishing, versioning, adding a service |
+| [`release.md`](release.md) | Release engineers | Runbook: cut a release, same-day hotfix, re-publish a tag, rollback/downgrade, audit composition, troubleshooting per job |
 | [`operations.md`](operations.md) | Operators (day-2) | `duynhlab-ctl` and `duynhlab-db-setup` reference, bring-up flow, systemd targets, configuration files, upgrade, remove, troubleshooting |
 
 ## Conventions used in these docs

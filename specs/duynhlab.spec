@@ -39,6 +39,9 @@ Requires:       coreutils
 Requires:       nginx >= 1.20
 Requires:       postgresql >= 14
 Requires:       (valkey >= 7.2 or redis >= 6)
+# mikefarah yq (EPEL ≥4.47 on EL9) — duynhlab-ctl parses services.yaml with it.
+# EPEL is already a documented prerequisite (valkey lives there too).
+Requires:       yq >= 4
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/bin/getent
 %{?systemd_requires}

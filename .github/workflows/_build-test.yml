@@ -1,0 +1,186 @@
+name: _build-test
+
+# Reusable build + test pipeline (workflow_call only) — the single source of
+# truth for "turn the 9 service repos into a tested mega-RPM". Called by:
+#   build.yml   (CI validation: version = CalVer date, artifact is CI-only)
+#   release.yml (releases:      version = tag, artifact gets published)
+# NOTE: caller `env:` does NOT propagate into a reusable workflow — everything
+# needed is defined here.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "RPM version. Empty = CalVer date (CI dev builds)."
+        type: string
+        default: ""
+      run-integration:
+        description: "Run the full systemd + Postgres integration test job."
+        type: boolean
+        default: true
+      artifact-name:
+        description: "Name for the uploaded RPM (+ MANIFEST.txt) artifact."
+        type: string
+        required: true
+      services-ref:
+        description: "Git ref to check out for every service repo."
+        type: string
+        default: "main"
+      checkout-ref:
+        description: "Ref of THIS repo to build from (empty = triggering sha). Release re-publish passes the tag."
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  DUYNHLAB_SRC_ROOT: ${{ github.workspace }}/src
+  CONTAINER_RUNNER: docker
+
+jobs:
+  build:
+    name: Build & install-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout packages repo
+        uses: actions/checkout@v6
+        with:
+          path: packages
+          ref: ${{ inputs.checkout-ref }}
+
+      - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
+        uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+          check-latest: true
+
+      - name: Set up Node (for frontend)
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext-base curl tar
+          # mikefarah yq v4 (build scripts parse services.yaml with it)
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Resolve version
+        run: |
+          v="${{ inputs.version }}"
+          [ -n "$v" ] || v="$(date -u +%Y.%m.%d)"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Building version $v"
+
+      - name: Fetch every service source
+        working-directory: packages
+        run: ./scripts/fetch-sources.sh "${{ inputs.services-ref }}"
+
+      - name: Build all services (binaries + frontend dist)
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          for svc in $(yq '.services[].name' services.yaml); do
+            echo "::group::build-local $svc"
+            ./scripts/build-local.sh "$svc" "$VERSION"
+            echo "::endgroup::"
+          done
+
+      - name: Render systemd units
+        working-directory: packages
+        run: ./scripts/render-systemd.sh
+
+      - name: Stage Source0 tarball (writes the composition manifest)
+        working-directory: packages
+        run: ./scripts/stage-all.sh
+
+      - name: Build mega-RPM (rpmbuild in container)
+        working-directory: packages
+        env:
+          BUILD_RUNNER: docker
+        run: ./scripts/build-rpm.sh
+
+      - name: Install test (Rocky 9)
+        working-directory: packages
+        run: ./scripts/test-install.sh
+
+      - name: Collect artifact (RPM + manifest)
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          cp build/staging/opt/duynhlab/etc/manifest dist/MANIFEST.txt
+          ls -lh dist/
+
+      - name: Upload artifact
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: |
+            packages/dist/*.x86_64.rpm
+            packages/dist/MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  # Full systemd + Postgres integration test — reuses the artifact, no rebuild.
+  test-integration:
+    name: Integration test (systemd + Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build
+    if: inputs.run-integration
+
+    steps:
+      - name: Checkout packages repo
+        uses: actions/checkout@v6
+        with:
+          path: packages
+          ref: ${{ inputs.checkout-ref }}
+
+      - name: Download RPM artifact from build job
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: packages/dist
+
+      - name: Install podman
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman uidmap
+          podman --version
+
+      # test-integration.sh boots a systemd container; the default centos:stream9
+      # image is minimal and has NO /sbin/init — build a systemd-capable image.
+      # Everything runs ROOTLESS (root podman + systemd-in-container breaks on
+      # the ubuntu runners).
+      - name: Build systemd-capable app image
+        run: |
+          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
+          FROM quay.io/centos/centos:stream9
+          RUN dnf -y install systemd && dnf clean all
+          EOF
+
+      # KEEP_POD=1 so a failure leaves the containers for the journal dump below.
+      - name: Integration test
+        working-directory: packages
+        env:
+          APP_IMAGE: localhost/duynhlab-test-init:latest
+          KEEP_POD: "1"
+        run: ./scripts/test-integration.sh
+
+      - name: Dump app journal on failure
+        if: failure()
+        run: |
+          set +e
+          podman ps -a
+          podman logs duynhlab-test-app    | tail -300 || true
+          podman logs duynhlab-test-db     | tail -100 || true
+          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true

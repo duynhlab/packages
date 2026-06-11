@@ -185,8 +185,9 @@ come pre-built from the service repos.
 - **Every service defaults to HTTP `8080` and gRPC `9090` in code.** On a shared host they collide, so
   `PORT`/`GRPC_PORT` MUST be set per service from `services.yaml` (`port`, `grpc_port`).
 - **Env path is flat:** `/etc/duynhlab/<svc>.env`.
-- **`duynhlab-ctl` needs mikefarah `yq` at runtime** but the RPM does not yet `Requires: yq` — a known
-  gap; ensure `yq` is present on hosts that use `duynhlab-ctl`.
+- **`duynhlab-ctl`'s `yq` comes via `Requires: yq >= 4`** (EPEL ships mikefarah yq ≥4.47 on EL9 —
+  historically it was the unrelated python-yq, so re-verify if the floor ever changes). Don't bundle
+  a private copy; the ctl resolver prefers `/opt/duynhlab/lib/yq` only as an escape hatch (B6).
 - **Frontend `VITE_API_BASE_URL` is baked at build time** — changing the gateway origin requires a
   rebuild.
 - **Never co-locate two services in one database** — golang-migrate's unqualified `schema_migrations`
