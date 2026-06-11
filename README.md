@@ -39,8 +39,10 @@ Makefile reference: [`docs/build.md`](docs/build.md).
 ## CI in one paragraph
 
 `build-rpms` ([`build.yml`](.github/workflows/build.yml)) **validates** every PR
-and push to `main` (docs-only changes skipped) — build, install test, full
-systemd + Postgres integration test — but never publishes. A **release is cut by
+and push to `main` (docs-only changes skipped) — build + install test on every
+run, plus the full systemd + Postgres integration test on `main` pushes and
+manual dispatches — but never publishes. Both it and `release.yml` share one
+pipeline: [`_build-test.yml`](.github/workflows/_build-test.yml). A **release is cut by
 pushing a CalVer tag** (`make release` → `v2026.06.11`, second cut of the day
 `v2026.06.11.1`): [`release.yml`](.github/workflows/release.yml) builds the RPM
 with the tag as its version, runs the same tests on that exact RPM, then uploads

@@ -187,9 +187,11 @@ Hosted on GitHub Pages, backed by the
 sudo dnf install -y duynhlab</pre>
 
 <h2>Bootstrap</h2>
-<pre>SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \\
-  sudo -E duynhlab-db-setup bootstrap
-sudo duynhlab-db-setup migrate
+<pre>for svc in auth user product cart order review notification shipping; do
+  SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \\
+    sudo -E duynhlab-db-setup bootstrap "\$svc"
+  sudo duynhlab-db-setup migrate "\$svc"
+done
 sudo systemctl enable --now duynhlab-platform.target</pre>
 
 <h2>Browse</h2>

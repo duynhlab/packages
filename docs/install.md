@@ -131,9 +131,10 @@ sudo systemctl restart duynhlab-platform.target
 Upgrades:
 
 - **Preserve** `/etc/duynhlab/*.env` and the database.
-- **Refuse to start** a service whose binary expects a higher
-  `SCHEMA_VERSION` than what is applied in the DB — run
-  `duynhlab-db-setup migrate` first.
+- **Do not auto-migrate.** Always run `duynhlab-db-setup migrate <svc>` after an
+  upgrade — a new binary may query tables/columns its embedded migrations have
+  not created yet, failing at runtime with SQL errors. (`SCHEMA_VERSION` under
+  `/opt/duynhlab/<svc>/` is audit metadata only — nothing blocks startup.)
 
 ### Downgrade / pin a version
 
@@ -178,7 +179,7 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;" ...
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `dnf install` fails: `Curl error (60): SSL certificate problem` | Mirror reach is restricted | `dnf install --setopt=sslverify=false` once, then fix CA |
-| `systemctl start duynhlab-auth` fails: "schema version mismatch" | Forgot `duynhlab-db-setup migrate auth` after upgrade | Run it, then restart |
+| Service starts but logs SQL errors (missing table/column) after an upgrade | Forgot `duynhlab-db-setup migrate auth` | Run it, then `systemctl restart duynhlab-auth` |
 | `nginx -t` fails after install | Existing `nginx.conf` already defines `server { listen 80; }` | Edit `/etc/nginx/nginx.conf` to remove the default `server` block; ours lives in `conf.d/duynhlab.conf` |
 | `duynhlab-ctl status` shows `inactive (dead)` | DB unreachable or password wrong | `grep DB_PASSWORD /etc/duynhlab/<svc>.env`, verify via `psql` |
 
