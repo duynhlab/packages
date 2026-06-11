@@ -31,7 +31,6 @@ sudo dnf install -y \
   postgresql      # client only; the server may live on another host
 ```
 
-(Replace `valkey` with `redis` if you prefer; the RPM accepts either.)
 
 If PostgreSQL is on the same host, also install `postgresql-server` and run
 `postgresql-setup --initdb && systemctl enable --now postgresql`.

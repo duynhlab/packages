@@ -38,7 +38,7 @@ log_step "Running install test inside rockylinux:9 ($RUNNER)"
 echo "::group::Repo + dependency setup"
 dnf -y install epel-release >/dev/null
 dnf -y module enable postgresql:16 >/dev/null
-# Valkey lives in EPEL on EL9; nginx in AppStream; redis in EPEL.
+# Valkey lives in EPEL on EL9; nginx in AppStream.
 # Deliberately NO yq here: customer hosts won't have it — duynhlab-ctl must
 # work with the copy bundled in the RPM (/opt/duynhlab/lib/yq).
 dnf -y install postgresql nginx valkey shadow-utils which file >/dev/null

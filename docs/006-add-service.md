@@ -54,13 +54,13 @@ This alone makes the **dynamic** parts pick the service up (see §4).
 
 | # | File | Where | What to add |
 |---|---|---|---|
-| 1 | `specs/duynhlab.spec` | `%check` ELF loop (~106) | `payments` in the `for svc in …` list |
-| 2 | `specs/duynhlab.spec` | `%post` systemd preset loop (~151) | same |
-| 3 | `specs/duynhlab.spec` | `%post` first-install hint heredoc (~170) | same (cosmetic) |
-| 4 | `specs/duynhlab.spec` | `%preun` stop loop (~196) | same |
-| 5 | `specs/duynhlab.spec` | `%postun` restart loop (~207) | same |
-| 6 | `specs/duynhlab.spec` | `%files` payload dirs (~219) | `%{duynhlab_prefix}/payments` |
-| 7 | `specs/duynhlab.spec` | `%files` ghost env list (~262) | `%ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/payments.env` |
+| 1 | `packages/rpm/duynhlab.spec` | `%check` ELF loop (~106) | `payments` in the `for svc in …` list |
+| 2 | `packages/rpm/duynhlab.spec` | `%post` systemd preset loop (~151) | same |
+| 3 | `packages/rpm/duynhlab.spec` | `%post` first-install hint heredoc (~170) | same (cosmetic) |
+| 4 | `packages/rpm/duynhlab.spec` | `%preun` stop loop (~196) | same |
+| 5 | `packages/rpm/duynhlab.spec` | `%postun` restart loop (~207) | same |
+| 6 | `packages/rpm/duynhlab.spec` | `%files` payload dirs (~219) | `%{duynhlab_prefix}/payments` |
+| 7 | `packages/rpm/duynhlab.spec` | `%files` ghost env list (~262) | `%ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/payments.env` |
 | 8 | `packages/rpm/lib/init-service.sh` | `BACKENDS` array (~19) | `payments` |
 | 9 | `packages/rpm/secret-tpl/payments.env.tpl` | **new file** | copy `auth.env.tpl`, set `SERVICE_NAME`/`PORT=8009`/(`GRPC_PORT`)/`DB_NAME=duynhlab_payments`/`DB_USER=duynhlab_payments_app`/migrator names; keep `__DB_PASSWORD__` placeholders |
 | 10 | `scripts/test-integration.sh` | `BACKENDS` array (~50) | `payments` |
@@ -73,7 +73,7 @@ Grep guard before committing — every hardcoded list should now contain the new
 name:
 
 ```bash
-grep -rn "notification shipping" specs/ scripts/ packages/ | grep -v payments && echo "MISSED A SPOT" || echo OK
+grep -rn "notification shipping" scripts/ packages/ | grep -v payments && echo "MISSED A SPOT" || echo OK
 ```
 
 ## 4. What you do NOT touch (dynamic — driven by services.yaml)

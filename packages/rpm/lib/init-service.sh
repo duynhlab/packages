@@ -50,7 +50,7 @@ if [ -d /etc/nginx/conf.d ]; then
 fi
 
 # ── 4. valkey snippet (best-effort — package may not be installed) ───────────
-for valkey_dir in /etc/valkey/conf.d /etc/valkey /etc/redis/conf.d /etc/redis; do
+for valkey_dir in /etc/valkey/conf.d /etc/valkey; do
   if [ -d "$valkey_dir" ]; then
     copy_if_missing "$PREFIX/valkey/duynhlab.conf" \
                     "$valkey_dir/duynhlab.conf" \

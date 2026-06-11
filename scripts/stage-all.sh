@@ -115,8 +115,6 @@ ENV=production
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_SSLMODE=disable
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
 EOF
 log_ok "staged etc/services.yaml + env-global.properties"
 

@@ -134,7 +134,7 @@ services:
       app_user: duynhlab_notification_app
       migrator_user: duynhlab_notification_migrator
     dependencies:
-      # notification-service is PostgreSQL-only — NO Redis/Valkey (verified 2026-06-09,
+      # notification-service is PostgreSQL-only — no cache/queue dependency (verified 2026-06-09,
       # grep of repo found none). It calls auth over gRPC (AUTH_GRPC_ADDR), ordered by
       # the platform target, so no extra After= is needed here.
       after: []

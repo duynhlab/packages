@@ -30,7 +30,7 @@ Security/reliability invariants — do not regress these:
   overwrite an existing env file on reinstall/upgrade.
 - **Postinstall never mutates external state:** no DB migrations, no `systemctl enable`/`start`. RPM
   scriptlets must be idempotent.
-- **Never mutate operator-owned config** (`/etc/nginx/nginx.conf`, `/etc/valkey`/`redis`). Drop
+- **Never mutate operator-owned config** (`/etc/nginx/nginx.conf`, `/etc/valkey/valkey.conf`). Drop
   fragments under `conf.d/` only.
 - **Migrations are forward-only** and run as the migrator role against the **direct** DB host — never
   through a pooler (DDL via PgBouncer/PgCat is unsafe).
@@ -57,18 +57,18 @@ scripts/                       Build / render / ops scripts
 ├── build-local.sh             Build one service (go build / npm build) → build/<svc>/raw/
 ├── render-systemd.sh          services.yaml → per-service .service + duynhlab-platform.target
 ├── stage-all.sh               Assemble FHS payload → Source0 staging tarball
-├── build-rpm.sh               rpmbuild specs/duynhlab.spec → dist/*.rpm (host/podman/docker)
+├── build-rpm.sh               rpmbuild packages/rpm/duynhlab.spec → dist/*.rpm (host/podman/docker)
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
 └── test-install.sh / test-integration.sh   install / integration tests
 packages/
 ├── common/scripts/            duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env, duynhlab-gen-password
 └── rpm/
+    ├── duynhlab.spec          The mega-RPM SPEC (rpmbuild) — lives with the assets it packages
     ├── systemd/               duynhlab-service.tmpl.service, *.target(.tmpl)
     ├── scriptlets/            %pre/%post/%postun fragments
     ├── secret-tpl/            <svc>.env.tpl (PORT/GRPC_PORT/DB_*; __DB_PASSWORD__ placeholder)
     ├── nginx/ valkey/ postgresql/ logrotate/   config templates
     └── lib/                   init-service.sh, password-generator.sh
-specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          numbered reading order: 001-architecture … 006-add-service (see docs/README.md)
 .github/workflows/             _build-test.yml (reusable pipeline), build.yml (validate — calls it),
                                release.yml (tag-driven publish — calls it too)
@@ -78,7 +78,7 @@ plan-spec.md                   Internal roadmap + decisions + backlog (gitignore
 
 ## Packaging architecture
 
-**One mega-RPM**, built with `rpmbuild` against `specs/duynhlab.spec` — **not** per-service nFPM
+**One mega-RPM**, built with `rpmbuild` against `packages/rpm/duynhlab.spec` — **not** per-service nFPM
 (nFPM was abandoned, D27; `nfpm*.yaml`/`render-nfpm.sh` do not exist). Rationale: the platform deploys
 as a unit, so atomic upgrades + one dependency closure + one `dnf install duynhlab` win over
 independent per-service versioning.
@@ -104,7 +104,7 @@ Three stages, all driven by `services.yaml`:
    templates, generate the **composition manifest** (`etc/manifest` — the 9 service SHAs, used by
    release notes and shipped in the RPM), run `render-systemd.sh`, then tar everything as the
    Source0 staging tarball.
-3. **`build-rpm.sh`** — `rpmbuild -ba specs/duynhlab.spec` (host, else podman/rockylinux:9, else
+3. **`build-rpm.sh`** — `rpmbuild -ba packages/rpm/duynhlab.spec` (host, else podman/rockylinux:9, else
    docker) → `dist/duynhlab-<VERSION>-1.el9.x86_64.rpm`.
 
 ## Build, test, lint
