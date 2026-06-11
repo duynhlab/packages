@@ -38,13 +38,15 @@ Makefile reference: [`docs/build.md`](docs/build.md).
 
 ## CI in one paragraph
 
-`build-rpms` ([`build.yml`](.github/workflows/build.yml)) validates every PR and
-push to `main` (docs-only changes are skipped): job `build` compiles everything,
-builds the mega-RPM and install-tests it; job `test-integration` (main + manual) boots
-the RPM under real systemd with a Postgres sidecar. Only when `build-rpms` is
-green on `main` does `publish-yum-repo`
-([`publish-yum-repo.yml`](.github/workflows/publish-yum-repo.yml)) upload the RPM
-to a GitHub Release and deploy the YUM metadata to Pages. Details + rationale:
+`build-rpms` ([`build.yml`](.github/workflows/build.yml)) **validates** every PR
+and push to `main` (docs-only changes skipped) — build, install test, full
+systemd + Postgres integration test — but never publishes. A **release is cut by
+pushing a CalVer tag** (`make release` → `v2026.06.11`, second cut of the day
+`v2026.06.11.1`): [`release.yml`](.github/workflows/release.yml) builds the RPM
+with the tag as its version, runs the same tests on that exact RPM, then uploads
+it to a GitHub Release (notes auto-generated + a manifest of the 9 service
+commits) and refreshes the YUM metadata on Pages — indexing the **last 3
+releases**, so `dnf downgrade duynhlab` works. Details + rationale:
 [`docs/build.md`](docs/build.md) § CI workflows.
 
 ## Documentation

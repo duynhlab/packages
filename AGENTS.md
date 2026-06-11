@@ -70,7 +70,7 @@ packages/
     └── lib/                   init-service.sh, password-generator.sh
 specs/duynhlab.spec            The mega-RPM SPEC (rpmbuild)
 docs/                          architecture.md, build.md, operations.md, install.md
-.github/workflows/             build.yml (build + test-integration jobs), publish-yum-repo.yml
+.github/workflows/             build.yml (validate: build + test-integration), release.yml (tag-driven publish)
 build/  dist/                  Generated, gitignored — never hand-edit
 plan-spec.md                   Internal roadmap + decisions + backlog (gitignored)
 ```
@@ -174,6 +174,10 @@ come pre-built from the service repos.
 
 ## Gotchas and non-obvious rules
 
+- **Merging to `main` does NOT publish anything.** Releases are tag-driven: `make release` creates the
+  next free annotated CalVer tag (`vYYYY.MM.DD[.N]`) and `release.yml` builds + tests + publishes that
+  exact RPM in one run (version = tag). Don't recreate a `workflow_run` auto-publish chain, and don't
+  hand-craft release tags — use `make release` (S-D18).
 - **Migrations live in the binary**, not in the RPM. Don't reintroduce a `duynhlab-db-migrate` binary,
   loose `.sql`, or Flyway→golang-migrate filename conversion (D23/D24).
 - **Mega-RPM, not nFPM** (D27). `nfpm` is referenced nowhere; any `build/*/nfpm.yaml` are dead.

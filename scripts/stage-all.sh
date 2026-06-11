@@ -21,6 +21,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 
 VERSION="${VERSION:-$(date -u +%Y.%m.%d)}"
+# extract_backend sources each build-info.env, which also defines VERSION —
+# capture the platform version up front so later sections don't see the clobber.
+PLATFORM_VERSION="$VERSION"
 STAGE="$BUILD_DIR/staging"
 OPT="$STAGE/opt/duynhlab"
 SYSD="$STAGE/systemd"
@@ -104,7 +107,7 @@ install -m 0644 "$REPO_ROOT/services.yaml" "$OPT/etc/services.yaml"
 cat > "$OPT/etc/env-global.properties" <<EOF
 # /etc/duynhlab/env-global.properties — system-wide defaults loaded by every
 # duynhlab-*.service unit. Edit on the deployed host; not overwritten on upgrade.
-DUYNHLAB_VERSION=$VERSION
+DUYNHLAB_VERSION=$PLATFORM_VERSION
 LOG_LEVEL=info
 ENV=production
 DB_HOST=127.0.0.1
@@ -114,6 +117,23 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 EOF
 log_ok "staged etc/services.yaml + env-global.properties"
+
+# ── 5b. Composition manifest ──────────────────────────────────────────────────
+# Records exactly which service commits went into this build (audit/rebuild).
+# Shipped in the RPM at /opt/duynhlab/etc/manifest; release notes embed it too.
+MANIFEST="$OPT/etc/manifest"
+{
+  echo "# duynhlab platform manifest — version $PLATFORM_VERSION"
+  echo "# built_at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  while read -r svc; do
+    info="$BUILD_DIR/$svc/raw/build-info.env"
+    [[ -f "$info" ]] || die "Missing build-info.env for $svc (manifest)"
+    # Subshell: build-info.env sets VERSION/GIT_SHA — don't clobber our globals.
+    ( . "$info"; printf '%s sha=%s type=%s\n' "$svc" "${GIT_SHA:-unknown}" "${TYPE:-unknown}" )
+  done < <(svc_list)
+} > "$MANIFEST"
+chmod 0644 "$MANIFEST"
+log_ok "staged etc/manifest ($(grep -c '^[^#]' "$MANIFEST") services)"
 
 # ── 6. systemd units ──────────────────────────────────────────────────────────
 bash "$SCRIPT_DIR/render-systemd.sh" "$SYSD" >/dev/null

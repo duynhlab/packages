@@ -111,8 +111,8 @@ jobs:
 
   # Integration test: full systemd + Postgres. Reuses the RPM artifact from `build` — no rebuild.
   # Runs on main pushes + manual dispatch only (PRs already get the file-level install test
-  # above). Because publish-yum-repo triggers on this workflow's success, a failing
-  # failing integration test also blocks the release.
+  # above). This workflow VALIDATES only — nothing here publishes. Releases are
+  # cut by pushing a CalVer tag (`make release`) → .github/workflows/release.yml.
   test-integration:
     name: Integration test (systemd + Postgres)
     runs-on: ubuntu-latest

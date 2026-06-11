@@ -132,16 +132,26 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 flowchart LR
   PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build]
   B -->|artifact, main only| S[build-rpms: test-integration]
-  S -->|success on main| P[publish-yum-repo]
-  P -->|gh release upload| REL[(GitHub Release<br/>RPM asset)]
-  P -->|createrepo_c --location-prefix| GH[(gh-pages<br/>repodata only)]
-  MAN2[workflow_dispatch] --> P
+  TAG[push tag vYYYY.MM.DD<br/>via make release] --> G[release: guard]
+  G --> BT[release: build-test<br/>VERSION = tag]
+  BT -->|same artifact| PUB[release: publish]
+  PUB -->|gh release create<br/>notes + MANIFEST| REL[(GitHub Release<br/>RPM asset)]
+  PUB -->|createrepo_c last 3 releases| GH[(gh-pages<br/>repodata only)]
+  MAN[workflow_dispatch<br/>re-publish a tag] --> G
 ```
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact. Job `test-integration` (main + manual only, `needs: build`): download artifact → podman + systemd image → full systemd + Postgres integration test. A failing test-integration blocks publish. |
-| **publish-yum-repo** | [`publish-yum-repo.yml`](../.github/workflows/publish-yum-repo.yml) | `workflow_run` after build-rpms on `main`, manual | rebuild RPM → **`gh release create v<VER>` + upload RPM** → `createrepo_c --location-prefix <release-url>` → force-push orphan `gh-pages` (repodata only) → `deploy-pages` |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact (CI-only, 14d). Job `test-integration` (main + manual, `needs: build`): full systemd + Postgres integration test on the artifact. |
+| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install + test-integration on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
+
+**Cutting a release:**
+
+```bash
+git checkout main && git pull
+make release        # computes next free tag (v2026.06.11 → v2026.06.11.1 …),
+                    # creates an ANNOTATED tag, pushes it; release.yml does the rest
+```
 
 > **Critical ordering**: `stage-all.sh` must run before `build-rpm.sh` — the
 > spec's `Source0` is the staging tarball. Every build workflow includes that

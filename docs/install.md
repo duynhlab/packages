@@ -135,6 +135,27 @@ Upgrades:
   `SCHEMA_VERSION` than what is applied in the DB — run
   `duynhlab-db-setup migrate` first.
 
+### Downgrade / pin a version
+
+The repository metadata indexes the **last 3 releases**, so dnf can see and
+install older versions directly:
+
+```bash
+dnf list duynhlab --showduplicates       # see the available versions
+sudo dnf downgrade -y duynhlab           # one release back
+sudo dnf install -y duynhlab-2026.06.09  # or pin an exact version
+```
+
+> ⚠️ Downgrading the package does **not** downgrade the database schema —
+> migrations are forward-only. Only downgrade across versions whose
+> `SCHEMA_VERSION` matches (check the release notes), or restore the DB from a
+> backup taken before the upgrade.
+
+Releases older than the last 3: download the RPM from
+[GitHub Releases](https://github.com/duynhlab/packages/releases) and
+`sudo dnf install ./duynhlab-<ver>-1.el9.x86_64.rpm`. Every release ships a
+`MANIFEST.txt` asset recording the exact service commits it was built from.
+
 ## 6. Remove
 
 ```bash
