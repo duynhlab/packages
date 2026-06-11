@@ -20,7 +20,7 @@ flowchart TD
   UNITS --> SA
   SA -->|assemble FHS tree<br/>+ tar.gz| SRC0[(build/sources/<br/>duynhlab-VER-staging.tar.gz)]
   SRC0 --> BR[build-rpm.sh]
-  SPEC[specs/duynhlab.spec] --> BR
+  SPEC[packages/rpm/duynhlab.spec] --> BR
   BR -->|rpmbuild| RPM[dist/duynhlab-VER-1.el9.x86_64.rpm]
   RPM --> SM[test-install.sh / test-integration.sh]
   RPM --> PUB[publish-yum-repo.sh]
@@ -39,7 +39,7 @@ All scripts live in [`scripts/`](../scripts) and source
 | `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/*.tar.gz` + `.sha256` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; tar binary + migrations |
 | `render-systemd.sh [outdir]` | `services.yaml` + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree + generate the composition manifest (`etc/manifest`) → Source0 tarball |
-| `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba specs/duynhlab.spec` |
+| `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba packages/rpm/duynhlab.spec` |
 | `publish-yum-repo.sh` | `dist/*.x86_64.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
 
 > **Why no SRPMs are published**: `rpmbuild -ba` also emits a source RPM
@@ -206,5 +206,5 @@ from `python3 -m http.server`.
 2. `make fetch-sources build-local-all build` — units, staging tree, and
    `duynhlab-ctl` pick it up automatically.
 3. Update the hard-coded service loop in
-   [`specs/duynhlab.spec`](../specs/duynhlab.spec) `%check`/`%post` if the new
+   [`packages/rpm/duynhlab.spec`](../packages/rpm/duynhlab.spec) `%check`/`%post` if the new
    service is a backend (the spec lists the eight backends explicitly).

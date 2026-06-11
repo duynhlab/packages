@@ -12,9 +12,9 @@ The platform is built from many independent `duynhlab/*-service` repos, but it
 is **deployed as a unit**. One package means:
 
 - Atomic upgrades — all backends move together, no version skew between them.
-- One dependency closure (`nginx`, `postgresql`, `valkey`/`redis`, `systemd`).
+- One dependency closure (`nginx`, `postgresql`, `valkey`, `systemd`).
 - One `dnf install duynhlab` for operators.
-- A single SPEC ([`specs/duynhlab.spec`](../specs/duynhlab.spec)) instead of a
+- A single SPEC ([`packages/rpm/duynhlab.spec`](../packages/rpm/duynhlab.spec)) instead of a
   per-service build matrix.
 
 The trade-off (you cannot upgrade a single backend in isolation) is acceptable

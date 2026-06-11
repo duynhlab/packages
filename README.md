@@ -6,7 +6,7 @@ into a single **mega-RPM** and publishes it through a YUM repository hosted on
 GitHub Pages (metadata) + GitHub Releases (RPM assets).
 
 - **Format**: RPM (EL9 / Rocky · AlmaLinux · RHEL 9, `x86_64`)
-- **Build tool**: `rpmbuild` against [`specs/duynhlab.spec`](specs/duynhlab.spec) — no nFPM, no Docker build image
+- **Build tool**: `rpmbuild` against [`packages/rpm/duynhlab.spec`](packages/rpm/duynhlab.spec) — no nFPM, no Docker build image
 - **Output**: `duynhlab-<VERSION>-1.el9.x86_64.rpm` (8 backends + frontend + CLI + config templates)
 - **Source of truth**: [`services.yaml`](services.yaml) — every script and workflow renders from it
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/build-rpm.sh — build duynhlab mega-RPM.
 #
-# Runs rpmbuild against specs/duynhlab.spec using:
+# Runs rpmbuild against packages/rpm/duynhlab.spec using:
 #   $BUILD_DIR/sources/duynhlab-${VERSION}-staging.tar.gz   (produced by stage-all.sh)
 #
 # Runner selection ($BUILD_RUNNER):
@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 
 VERSION="${VERSION:-$(date -u +%Y.%m.%d)}"
-SPEC="$REPO_ROOT/specs/duynhlab.spec"
+SPEC="$REPO_ROOT/packages/rpm/duynhlab.spec"
 SRC="$BUILD_DIR/sources/duynhlab-${VERSION}-staging.tar.gz"
 TOP="$BUILD_DIR/rpmbuild"
 
@@ -67,7 +67,7 @@ run_container_build() {
         dnf -y install --setopt=install_weak_deps=False rpm-build systemd-rpm-macros file >/dev/null
       fi
       mkdir -p build/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-      rpmbuild -ba specs/duynhlab.spec \
+      rpmbuild -ba packages/rpm/duynhlab.spec \
         --define "_topdir /workspace/build/rpmbuild" \
         --define "_sourcedir /workspace/build/sources" \
         --define "_duynhlab_version ${VERSION}"

@@ -101,14 +101,32 @@ journalctl -u 'duynhlab-*' -e --no-pager      # all logs
 
 ## 5. Configuration
 
-| File | Owner | Notes |
-|---|---|---|
-| `/etc/duynhlab/env-global.properties` | operator | Shared env (DB host, etc.), loaded first |
-| `/etc/duynhlab/<svc>.env` | package (1st install) | Per-service env incl. random `DB_PASSWORD`, `0640`, never overwritten on upgrade |
-| `/etc/duynhlab/<svc>.override` | operator | Optional last-wins overrides (`EnvironmentFile=-`) |
+### Layering — how a service gets its environment
 
-To change a service's runtime setting without touching package files, write it
-to `<svc>.override` and `systemctl restart duynhlab-<svc>`.
+Every `duynhlab-<svc>.service` unit loads three files **in order; a later file
+overrides any variable set by an earlier one** (standard systemd
+`EnvironmentFile=` semantics; the `-` prefix means "optional, skip if absent"):
+
+```
+EnvironmentFile=-/etc/duynhlab/env-global.properties   ① shared defaults
+EnvironmentFile=/etc/duynhlab/<svc>.env                ② machine-generated, REQUIRED
+EnvironmentFile=-/etc/duynhlab/<svc>.override          ③ yours — loaded last, wins
+```
+
+| Layer | File | Owner | Notes |
+|---|---|---|---|
+| ① defaults | `env-global.properties` | operator | Shared values (e.g. `DB_HOST`); installed once, editable |
+| ② generated | `<svc>.env` | package (1st install) | Rendered from `secret-tpl/<svc>.env.tpl` with a random `DB_PASSWORD`; `0640 root:duynhlab`; **never overwritten** on reinstall/upgrade |
+| ③ override | `<svc>.override` | **you** | The RPM never creates or touches it — your per-host customizations live here and survive every upgrade |
+
+Example: `auth.env` says `DB_HOST=localhost`; create `auth.override` with
+`DB_HOST=db.prod.internal` and restart — the service now uses the override.
+Delete the file to fall back.
+
+**Rule of thumb: never edit the generated `<svc>.env`** (your edit is safe from
+the RPM, but mixing hand edits into a machine-managed file makes drift hard to
+reason about). Put changes in `<svc>.override`, then
+`systemctl restart duynhlab-<svc>`.
 
 ## 6. Upgrade
 
