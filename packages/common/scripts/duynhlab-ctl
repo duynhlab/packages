@@ -29,11 +29,19 @@ fi
 
 die() { echo "$PROG: $*" >&2; exit 1; }
 
-require_yq() { command -v yq >/dev/null 2>&1 || die "yq required (install: go install github.com/mikefarah/yq/v4@latest)"; }
+# mikefarah yq — normally on PATH via the RPM's `Requires: yq` (EPEL ≥4.47).
+# A copy at $OPT_BASE/lib/yq takes precedence if present (escape hatch), and
+# YQ=… overrides everything.
+YQ=${YQ:-}
+if [[ -z "$YQ" ]]; then
+  if [[ -x "$OPT_BASE/lib/yq" ]]; then YQ="$OPT_BASE/lib/yq"; else YQ=yq; fi
+fi
 
-list_services() { require_yq; yq '.services[].name' "$SERVICES_YAML"; }
-svc_port() { yq ".services[] | select(.name==\"$1\") | .port" "$SERVICES_YAML"; }
-svc_type() { yq ".services[] | select(.name==\"$1\") | .type" "$SERVICES_YAML"; }
+require_yq() { command -v "$YQ" >/dev/null 2>&1 || die "yq not found — install mikefarah yq (EPEL: dnf install yq)"; }
+
+list_services() { require_yq; "$YQ" '.services[].name' "$SERVICES_YAML"; }
+svc_port() { "$YQ" ".services[] | select(.name==\"$1\") | .port" "$SERVICES_YAML"; }
+svc_type() { "$YQ" ".services[] | select(.name==\"$1\") | .type" "$SERVICES_YAML"; }
 
 resolve_targets() {
   if [[ "$1" == "all" ]]; then list_services; else echo "$1"; fi
@@ -105,7 +113,7 @@ cmd_config() {
 cmd_ports() {
   require_yq
   local filter=${1:-}
-  yq -r ".services[] | [.name, .port, .type] | @tsv" "$SERVICES_YAML" \
+  "$YQ" -r ".services[] | [.name, .port, .type] | @tsv" "$SERVICES_YAML" \
     | { [[ -n "$filter" ]] && grep -i "$filter" || cat; } \
     | column -t
 }

@@ -82,111 +82,19 @@ jobs:
           echo "version=${tag#v}"  >> "$GITHUB_OUTPUT"
           echo "Releasing $tag (version ${tag#v}, commit $sha)"
 
+  # The shared pipeline (same one build.yml uses for CI) — version comes from
+  # the tag, so the RPM NEVR matches it, and the integration test runs on the
+  # exact artifact that publish ships. checkout-ref pins the repo to the tag
+  # (matters for workflow_dispatch re-publish, which runs from main).
   build-test:
-    name: Build + test (version = tag)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    name: build-test
     needs: guard
-    env:
-      VERSION: ${{ needs.guard.outputs.version }}
-    steps:
-      - name: Checkout packages repo at tag
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.guard.outputs.tag }}
-          path: packages
-
-      - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
-        uses: actions/setup-go@v6
-        with:
-          go-version: "stable"
-          check-latest: true
-
-      - name: Set up Node (for frontend)
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-
-      - name: Install host tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gettext-base curl tar podman uidmap
-          sudo curl -fsSL -o /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          yq --version
-
-      - name: Fetch every service source
-        working-directory: packages
-        run: ./scripts/fetch-sources.sh main
-
-      - name: Build all services (version = ${{ needs.guard.outputs.version }})
-        working-directory: packages
-        run: |
-          set -euo pipefail
-          for svc in $(yq '.services[].name' services.yaml); do
-            echo "::group::build-local $svc"
-            ./scripts/build-local.sh "$svc" "$VERSION"
-            echo "::endgroup::"
-          done
-
-      - name: Render systemd units
-        working-directory: packages
-        run: ./scripts/render-systemd.sh
-
-      - name: Stage Source0 tarball (writes the composition manifest)
-        working-directory: packages
-        run: ./scripts/stage-all.sh
-
-      - name: Build mega-RPM
-        working-directory: packages
-        env:
-          BUILD_RUNNER: docker
-        run: ./scripts/build-rpm.sh
-
-      - name: Install test (Rocky 9)
-        working-directory: packages
-        run: ./scripts/test-install.sh
-
-      - name: Build systemd-capable app image
-        run: |
-          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
-          FROM quay.io/centos/centos:stream9
-          RUN dnf -y install systemd && dnf clean all
-          EOF
-
-      - name: Integration test (systemd + Postgres)
-        working-directory: packages
-        env:
-          APP_IMAGE: localhost/duynhlab-test-init:latest
-          KEEP_POD: "1"
-        run: ./scripts/test-integration.sh
-
-      - name: Dump app journal on failure
-        if: failure()
-        run: |
-          set +e
-          podman ps -a
-          podman logs duynhlab-test-app    | tail -300 || true
-          podman logs duynhlab-test-db     | tail -100 || true
-          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true
-
-      - name: Collect release artifact (RPM + manifest)
-        working-directory: packages
-        run: |
-          set -euo pipefail
-          cp build/staging/opt/duynhlab/etc/manifest dist/MANIFEST.txt
-          ls -lh dist/
-
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: duynhlab-release-${{ needs.guard.outputs.tag }}
-          path: |
-            packages/dist/*.x86_64.rpm
-            packages/dist/MANIFEST.txt
-          if-no-files-found: error
-          retention-days: 14
+    uses: ./.github/workflows/_build-test.yml
+    with:
+      version: ${{ needs.guard.outputs.version }}
+      checkout-ref: ${{ needs.guard.outputs.tag }}
+      run-integration: true
+      artifact-name: duynhlab-release-${{ needs.guard.outputs.tag }}
 
   publish:
     name: Publish (Release + YUM repo)

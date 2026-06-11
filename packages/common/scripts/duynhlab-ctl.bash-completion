@@ -9,9 +9,10 @@ _duynhlab_ctl() {
     return
   fi
 
-  local svcs=""
-  if command -v yq >/dev/null 2>&1 && [[ -f /etc/duynhlab/services.yaml ]]; then
-    svcs=$(yq '.services[].name' /etc/duynhlab/services.yaml 2>/dev/null)
+  local svcs="" yq_bin=yq
+  [[ -x /opt/duynhlab/lib/yq ]] && yq_bin=/opt/duynhlab/lib/yq
+  if command -v "$yq_bin" >/dev/null 2>&1 && [[ -f /etc/duynhlab/services.yaml ]]; then
+    svcs=$("$yq_bin" '.services[].name' /etc/duynhlab/services.yaml 2>/dev/null)
   fi
 
   case "${words[1]}" in

@@ -39,7 +39,9 @@ echo "::group::Repo + dependency setup"
 dnf -y install epel-release >/dev/null
 dnf -y module enable postgresql:16 >/dev/null
 # Valkey lives in EPEL on EL9; nginx in AppStream; redis in EPEL.
-dnf -y install yq postgresql nginx valkey shadow-utils which file >/dev/null
+# Deliberately NO yq here: customer hosts won't have it — duynhlab-ctl must
+# work with the copy bundled in the RPM (/opt/duynhlab/lib/yq).
+dnf -y install postgresql nginx valkey shadow-utils which file >/dev/null
 echo "::endgroup::"
 
 echo "::group::dnf localinstall mega-RPM"
@@ -89,7 +91,15 @@ done
 ! which duynhlab-db-migrate 2>/dev/null || { echo "UNEXPECTED duynhlab-db-migrate present"; exit 1; }
 duynhlab-gen-password 16 || true
 test -f /etc/duynhlab/services.yaml || { echo "services.yaml not dropped"; exit 1; }
-yq '.services[].name' /etc/duynhlab/services.yaml | tr '\n' ' '; echo
+echo "::endgroup::"
+
+echo "::group::duynhlab-ctl works out-of-box (yq pulled as RPM dependency)"
+# We never install yq by hand in this test — `Requires: yq` must have made dnf
+# pull it (mikefarah yq from EPEL). This reproduces a clean customer host.
+command -v yq >/dev/null 2>&1 || { echo "MISSING yq — Requires: yq not resolved"; exit 1; }
+yq --version | grep -q mikefarah || { echo "WRONG yq (expected mikefarah): $(yq --version)"; exit 1; }
+duynhlab-ctl list
+duynhlab-ctl ports
 echo "::endgroup::"
 
 echo "::group::systemd units"
