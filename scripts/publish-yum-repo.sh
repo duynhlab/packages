@@ -144,7 +144,10 @@ if [[ -n "$RELEASE_BASE_URL" ]]; then
   rm -rf "$REPO_OUT/$ARCH_DIR/repodata"
   mkdir -p "$REPO_OUT/$ARCH_DIR"
   cp -rf "$CR_INPUT/repodata" "$REPO_OUT/$ARCH_DIR/repodata"
-  rm -rf "$CR_INPUT"
+  # Scratch cleanup must never fail the publish (rootless podman can leave
+  # subuid-owned files behind that the invoking user cannot remove).
+  rm -rf "$CR_INPUT" 2>/dev/null \
+    || log_warn "could not fully clean $CR_INPUT (container-owned files) — continuing"
 fi
 
 log_ok "repodata generated: $REPO_OUT/$ARCH_DIR/repodata/repomd.xml"
