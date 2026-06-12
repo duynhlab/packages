@@ -39,7 +39,7 @@ echo "::group::Repo + dependency setup"
 dnf -y install epel-release >/dev/null
 dnf -y module enable postgresql:16 >/dev/null
 # Valkey lives in EPEL on EL9; nginx in AppStream.
-# Deliberately NO yq here: customer hosts won't have it — duynhlab-ctl must
+# Deliberately NO yq here: customer hosts won't have it — duynhctl must
 # work with the copy bundled in the RPM (/opt/duynhlab/lib/yq).
 dnf -y install postgresql nginx valkey shadow-utils which file >/dev/null
 echo "::endgroup::"
@@ -83,23 +83,23 @@ echo "Layout OK"
 echo "::endgroup::"
 
 echo "::group::CLI symlinks"
-for c in duynhlab-ctl duynhlab-db-setup \
-         duynhlab-gen-env duynhlab-gen-password; do
+for c in duynhctl duynhdb \
+         duynhenv duynhpass; do
   which "$c"
 done
 # duynhlab-db-migrate must NOT exist anymore (D23).
 ! which duynhlab-db-migrate 2>/dev/null || { echo "UNEXPECTED duynhlab-db-migrate present"; exit 1; }
-duynhlab-gen-password 16 || true
+duynhpass 16 || true
 test -f /etc/duynhlab/services.yaml || { echo "services.yaml not dropped"; exit 1; }
 echo "::endgroup::"
 
-echo "::group::duynhlab-ctl works out-of-box (yq pulled as RPM dependency)"
+echo "::group::duynhctl works out-of-box (yq pulled as RPM dependency)"
 # We never install yq by hand in this test — `Requires: yq` must have made dnf
 # pull it (mikefarah yq from EPEL). This reproduces a clean customer host.
 command -v yq >/dev/null 2>&1 || { echo "MISSING yq — Requires: yq not resolved"; exit 1; }
 yq --version | grep -q mikefarah || { echo "WRONG yq (expected mikefarah): $(yq --version)"; exit 1; }
-duynhlab-ctl list
-duynhlab-ctl ports
+duynhctl list
+duynhctl ports
 echo "::endgroup::"
 
 echo "::group::secret versioning — re-running the generator must change nothing"
@@ -121,7 +121,7 @@ cat /var/log/duynhlab/version.log
 echo "::endgroup::"
 
 echo "::group::support-bundle contains NO secrets"
-duynhlab-ctl support-bundle /tmp
+duynhctl support-bundle /tmp
 bundle=$(ls /tmp/duynhlab-support-*.tar.gz | head -1)
 [ -f "$bundle" ] || { echo "NO bundle produced"; exit 1; }
 # Take a real password value and prove it is absent from the bundle.
@@ -184,10 +184,10 @@ test -d /var/log/duynhlab/nginx
 ls -ld /var/log/duynhlab /var/log/duynhlab/auth /var/log/duynhlab/nginx
 echo "::endgroup::"
 
-echo "::group::duynhlab-ctl basic commands"
-duynhlab-ctl list || true
-duynhlab-ctl ports || true
-duynhlab-ctl version || true
+echo "::group::duynhctl basic commands"
+duynhctl list || true
+duynhctl ports || true
+duynhctl version || true
 echo "::endgroup::"
 
 echo "::group::Reinstall preserves env"

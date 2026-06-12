@@ -23,8 +23,8 @@ TPL=/opt/duynhlab/secret-tpl
 STATE_FILE="$ETC/secret_version.properties"
 CURRENT_SECRET_VERSION=1
 
-GEN_PASS=/opt/duynhlab/lib/duynhlab-gen-password
-GEN_ENV=/opt/duynhlab/lib/duynhlab-gen-env
+GEN_PASS=/opt/duynhlab/lib/duynhpass
+GEN_ENV=/opt/duynhlab/lib/duynhenv
 
 log() { printf '[password-generator] %s\n' "$*"; }
 
@@ -59,7 +59,7 @@ if [ "$have" -lt 1 ]; then
     if [ -x "$GEN_ENV" ]; then
       "$GEN_ENV" "$svc"
     else
-      # Inline fallback if duynhlab-gen-env is missing.
+      # Inline fallback if duynhenv is missing.
       pass=$("$GEN_PASS" 32 2>/dev/null || \
              tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 32)
       sed "s/__DB_PASSWORD__/${pass}/g" "$tpl" > "$env_file"

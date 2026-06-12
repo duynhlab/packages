@@ -1,9 +1,9 @@
 -- bootstrap.sql — duynhlab per-service databases + roles.
 --
--- Rendered/applied by /usr/bin/duynhlab-db-setup as the postgres superuser.
+-- Rendered/applied by /usr/bin/duynhdb as the postgres superuser.
 -- Idempotent: uses DO blocks + IF NOT EXISTS guards.
 --
--- This file is a TEMPLATE — duynhlab-db-setup substitutes:
+-- This file is a TEMPLATE — duynhdb substitutes:
 --   :svc        short name (e.g. auth)
 --   :db         duynhlab_<svc>
 --   :app_user   duynhlab_<svc>_app

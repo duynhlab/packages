@@ -8,8 +8,8 @@
 #   opt/duynhlab/etc/{services.yaml, env-global.properties}
 #   opt/duynhlab/{nginx,valkey,postgresql,secret-tpl,logrotate}/...
 #   opt/duynhlab/lib/{init-service.sh, password-generator.sh,
-#                     duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env,
-#                     duynhlab-gen-password, duynhlab-ctl.bash-completion}
+#                     duynhctl, duynhdb, duynhenv,
+#                     duynhpass, duynhctl.bash-completion}
 #   systemd/duynhlab-*.{service,target}
 #
 # Final tarball:
@@ -84,15 +84,15 @@ tar -xzf "$frontend_tgz" -C "$OPT/frontend"
 log_ok "staged frontend"
 
 # ── 3. CLI tools + library scripts ────────────────────────────────────────────
-install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-ctl"           "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-db-setup"      "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-gen-env"       "$OPT/lib/"
-install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-gen-password"  "$OPT/lib/"
-install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhlab-ctl.bash-completion" "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhctl"           "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhdb"      "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhenv"       "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhpass"  "$OPT/lib/"
+install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhctl.bash-completion" "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/init-service.sh"               "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/password-generator.sh"         "$OPT/lib/"
 log_ok "staged CLI + lib"
-# NOTE: duynhlab-ctl's yq comes via `Requires: yq` in the spec (EPEL ships
+# NOTE: duynhctl's yq comes via `Requires: yq` in the spec (EPEL ships
 # mikefarah yq ≥4.47 on EL9) — nothing to bundle here.
 
 # ── 4. Config templates ───────────────────────────────────────────────────────

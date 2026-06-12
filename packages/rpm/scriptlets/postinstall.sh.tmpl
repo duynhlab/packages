@@ -11,7 +11,7 @@ TEMPLATE="${ETC_DIR}/${SVC}.env.template"
 mkdir -p "${ETC_DIR}"
 
 if [ ! -f "${ENV_FILE}" ]; then
-  PASS="$(/usr/bin/duynhlab-gen-password 32 2>/dev/null || \
+  PASS="$(/usr/bin/duynhpass 32 2>/dev/null || \
           tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
 
   cat > "${ENV_FILE}" <<EOF
@@ -42,8 +42,8 @@ EOF
   echo ""
   echo "  Next steps (as root):"
   echo "    SUPERUSER_DSN=postgresql://postgres:secret@localhost:5432/postgres \\"
-  echo "      duynhlab-db-setup bootstrap ${SVC}"
-  echo "    duynhlab-db-setup migrate ${SVC}"
+  echo "      duynhdb bootstrap ${SVC}"
+  echo "    duynhdb migrate ${SVC}"
   echo "    systemctl enable --now duynhlab-${SVC}"
   echo "================================================================"
 else

@@ -189,8 +189,8 @@ sudo dnf install -y duynhlab</pre>
 <h2>Bootstrap</h2>
 <pre>for svc in auth user product cart order review notification shipping; do
   SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \\
-    sudo -E duynhlab-db-setup bootstrap "\$svc"
-  sudo duynhlab-db-setup migrate "\$svc"
+    sudo -E duynhdb bootstrap "\$svc"
+  sudo duynhdb migrate "\$svc"
 done
 sudo systemctl enable --now duynhlab-platform.target</pre>
 

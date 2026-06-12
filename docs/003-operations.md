@@ -5,41 +5,41 @@ databases, and troubleshooting. All commands assume `root` (or `sudo`).
 
 ---
 
-## 1. `duynhlab-ctl` — service control
+## 1. `duynhctl` — service control
 
 A thin, safe wrapper around `systemctl`/`journalctl` that knows the service
 list from `/etc/duynhlab/services.yaml` (parsed with mikefarah `yq`, which the
 RPM pulls automatically via `Requires: yq` — no manual install needed).
 
 ```
-duynhlab-ctl <command> [svc|all] [args]
+duynhctl <command> [svc|all] [args]
 ```
 
 | Command | Example | Description |
 |---|---|---|
-| `list` | `duynhlab-ctl list` | List all services from `services.yaml` |
-| `status` | `duynhlab-ctl status all` | systemd status table |
-| `start` | `duynhlab-ctl start auth` | Start service(s) |
-| `stop` | `duynhlab-ctl stop all` | Stop service(s) |
-| `restart` | `duynhlab-ctl restart order` | Restart service(s) |
-| `enable` | `duynhlab-ctl enable all` | Enable on boot |
-| `disable` | `duynhlab-ctl disable user` | Disable on boot |
-| `logs` | `duynhlab-ctl logs auth -f` | Tail journal (extra args → `journalctl`) |
-| `health` | `duynhlab-ctl health all` | `curl /health` on each configured port |
-| `version` | `duynhlab-ctl version all` | Print binary + schema versions |
-| `config` | `duynhlab-ctl config auth` | Show env file (password masked) |
-| `ports` | `duynhlab-ctl ports` | Port assignment table |
-| `support-bundle` | `duynhlab-ctl support-bundle [dir]` | Diagnostics tarball for support: 7 days of journals, unit status, manifest, versions, install history, non-secret configs. **`*.env` / `*.override` are never included** |
+| `list` | `duynhctl list` | List all services from `services.yaml` |
+| `status` | `duynhctl status all` | systemd status table |
+| `start` | `duynhctl start auth` | Start service(s) |
+| `stop` | `duynhctl stop all` | Stop service(s) |
+| `restart` | `duynhctl restart order` | Restart service(s) |
+| `enable` | `duynhctl enable all` | Enable on boot |
+| `disable` | `duynhctl disable user` | Disable on boot |
+| `logs` | `duynhctl logs auth -f` | Tail journal (extra args → `journalctl`) |
+| `health` | `duynhctl health all` | `curl /health` on each configured port |
+| `version` | `duynhctl version all` | Print binary + schema versions |
+| `config` | `duynhctl config auth` | Show env file (password masked) |
+| `ports` | `duynhctl ports` | Port assignment table |
+| `support-bundle` | `duynhctl support-bundle [dir]` | Diagnostics tarball for support: 7 days of journals, unit status, manifest, versions, install history, non-secret configs. **`*.env` / `*.override` are never included** |
 
 `svc` accepts a single name or `all`. Health/version iterate every service.
 
-## 2. `duynhlab-db-setup` — database management
+## 2. `duynhdb` — database management
 
 Operates **per service**. Reads connection settings from
 `/etc/duynhlab/<svc>.env`.
 
 ```
-duynhlab-db-setup <bootstrap|migrate|status> <svc>
+duynhdb <bootstrap|migrate|status> <svc>
 ```
 
 | Subcommand | Needs | Description |
@@ -59,8 +59,8 @@ duynhlab-db-setup <bootstrap|migrate|status> <svc>
 ```bash
 export SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres"
 for svc in auth user product cart order review notification shipping; do
-  duynhlab-db-setup bootstrap "$svc"
-  duynhlab-db-setup migrate   "$svc"
+  duynhdb bootstrap "$svc"
+  duynhdb migrate   "$svc"
 done
 ```
 
@@ -74,14 +74,14 @@ flowchart LR
   I[dnf install duynhlab] --> B["db-setup bootstrap &lt;svc&gt;<br/>(per backend)"]
   B --> M["db-setup migrate &lt;svc&gt;"]
   M --> E[systemctl enable --now<br/>duynhlab-platform.target]
-  E --> V[duynhlab-ctl status / health]
+  E --> V[duynhctl status / health]
 ```
 
 ```bash
 # after bootstrap + migrate:
 systemctl enable --now duynhlab-platform.target
-duynhlab-ctl status all
-duynhlab-ctl health all
+duynhctl status all
+duynhctl health all
 curl -fsS http://localhost/health
 ```
 
@@ -135,7 +135,7 @@ reason about). Put changes in `<svc>.override`, then
 dnf upgrade -y duynhlab
 # apply any migrations shipped in the new payload, per backend:
 for svc in auth user product cart order review notification shipping; do
-  duynhlab-db-setup migrate "$svc"
+  duynhdb migrate "$svc"
 done
 systemctl restart duynhlab-platform.target
 ```
@@ -165,12 +165,12 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;"   # … per service
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `duynhlab-ctl status` shows `inactive (dead)` | DB unreachable / wrong password | `duynhlab-ctl config <svc>`, verify with `psql` |
-| Service logs SQL errors (missing table/column) after upgrade | Forgot `migrate` | `duynhlab-db-setup migrate <svc>`, restart |
+| `duynhctl status` shows `inactive (dead)` | DB unreachable / wrong password | `duynhctl config <svc>`, verify with `psql` |
+| Service logs SQL errors (missing table/column) after upgrade | Forgot `migrate` | `duynhdb migrate <svc>`, restart |
 | `nginx -t` fails after install | Existing `server { listen 80; }` in `nginx.conf` | Remove the default server block; ours is in `conf.d/duynhlab.conf` |
-| `health` reports connection refused | Service not started or wrong port | `duynhlab-ctl start <svc>`; check `duynhlab-ctl ports` |
+| `health` reports connection refused | Service not started or wrong port | `duynhctl start <svc>`; check `duynhctl ports` |
 | `db-setup bootstrap` errors `SUPERUSER_DSN` | Env var not exported | `export SUPERUSER_DSN=postgresql://postgres:…` |
-| `db-setup` errors `DB_PASSWORD empty` | Env file not generated | Reinstall, or run `duynhlab-gen-password` |
+| `db-setup` errors `DB_PASSWORD empty` | Env file not generated | Reinstall, or run `duynhpass` |
 
 See [install.md](002-install.md) for first-time setup and [architecture.md](001-architecture.md)
 for the systemd/DB model.

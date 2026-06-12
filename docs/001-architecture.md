@@ -34,7 +34,7 @@ flowchart TB
       ETCMETA["etc/services.yaml<br/>etc/env-global.properties"]
     end
     UNITS["systemd units<br/>duynhlab-&lt;svc&gt;.service ×8<br/>duynhlab-platform.target<br/>duynhlab-infra.target"]
-    BIN["/usr/bin symlinks<br/>duynhlab-ctl, duynhlab-db-setup, …"]
+    BIN["/usr/bin symlinks<br/>duynhctl, duynhdb, …"]
   end
 ```
 
@@ -42,7 +42,7 @@ flowchart TB
 |---|---|---|
 | Backend services | 8 | Static Go binaries (`CGO_ENABLED=0`), one per `services.yaml` entry of `type: backend` |
 | Frontend | 1 | `type: static`, npm build output served by nginx |
-| CLI tools | 4 | `duynhlab-ctl`, `duynhlab-db-setup`, `duynhlab-gen-env`, `duynhlab-gen-password` |
+| CLI tools | 4 | `duynhctl`, `duynhdb`, `duynhenv`, `duynhpass` |
 | systemd units | 8 + 2 targets | per-service `.service` + `duynhlab-platform.target` + `duynhlab-infra.target` |
 
 ### Services (from `services.yaml`)
@@ -60,7 +60,7 @@ flowchart TB
 | frontend | — | — | static, served by nginx |
 
 > `services.yaml` is the single source of truth. Adding a service there +
-> rebuilding regenerates units, the staging tree, and `duynhlab-ctl` output.
+> rebuilding regenerates units, the staging tree, and `duynhctl` output.
 
 ## 3. Filesystem layout (FHS)
 
@@ -174,7 +174,7 @@ What the scriptlets guarantee:
   `/etc/duynhlab/*.env`.
 - **No auto-start** — installing does not enable or start any unit.
 - **No auto-migrate** — the DB schema is the operator's responsibility via
-  `duynhlab-db-setup migrate`.
+  `duynhdb migrate`.
 - **No mutation of user-owned config** — nginx/valkey fragments are dropped
   under `conf.d/`, never overwriting `nginx.conf`/`valkey.conf`.
 
@@ -190,7 +190,7 @@ flowchart LR
     MIG[duynhlab_&lt;svc&gt;_migrator<br/>DDL]
   end
   RT[duynhlab-&lt;svc&gt;.service] -->|DB_PASSWORD<br/>app role| APP --> DB
-  MIGCLI[duynhlab-db-setup migrate] --> MIG --> DB
+  MIGCLI[duynhdb migrate] --> MIG --> DB
 ```
 
 - `bootstrap` (needs `SUPERUSER_DSN`) creates the database + both roles + grants.

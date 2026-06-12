@@ -15,12 +15,12 @@ conventions or the pipeline can't build/run it:
 - **Migrations embedded in the binary**: `db/migrations/sql/000NNN_*.up.sql`
   (forward-only, no `.down.sql`), embedded via `//go:embed` and applied by the
   binary's own `migrate` subcommand through `github.com/duynhlab/pkg/migratex`.
-  `duynhlab-db-setup migrate payments` execs exactly that.
+  `duynhdb migrate payments` execs exactly that.
 - **Config via discrete env vars** (no `DATABASE_URL`): `DB_HOST DB_PORT
   DB_NAME DB_USER DB_PASSWORD DB_SSLMODE`, plus `PORT` (and `GRPC_PORT` if it
   serves gRPC). Defaults of 8080/9090 in code are fine — the RPM overrides
   them per service.
-- **`GET /health`** returning 200 on the HTTP port — `duynhlab-ctl health` and
+- **`GET /health`** returning 200 on the HTTP port — `duynhctl health` and
   the integration test poll it.
 - Logs to stdout/stderr (journald captures them).
 
@@ -80,8 +80,8 @@ grep -rn "notification shipping" scripts/ packages/ | grep -v payments && echo "
 
 `fetch-sources.sh`, `build-local.sh`, `render-systemd.sh` (unit + platform
 target), `stage-all.sh` (staging + composition manifest), `Makefile
-build-local-all`, `duynhlab-ctl` (list/health/ports), `password-generator.sh`
-(scans `secret-tpl/*.env.tpl`), `duynhlab-db-setup` (per-service args),
+build-local-all`, `duynhctl` (list/health/ports), `password-generator.sh`
+(scans `secret-tpl/*.env.tpl`), `duynhdb` (per-service args),
 `bootstrap.sql`. They all iterate the registry — no edits needed.
 
 ## 5. Build & verify locally
@@ -104,8 +104,8 @@ On a test host (or in the integration container):
 
 ```bash
 SUPERUSER_DSN="postgresql://postgres:…@localhost:5432/postgres" \
-  sudo -E duynhlab-db-setup bootstrap payments
-sudo duynhlab-db-setup migrate payments
+  sudo -E duynhdb bootstrap payments
+sudo duynhdb migrate payments
 sudo systemctl start duynhlab-payments && curl -fsS localhost:8009/health
 ```
 

@@ -79,7 +79,7 @@ The post-install scriptlet:
 
 ## 3. Bootstrap the database (one-time)
 
-`duynhlab-db-setup` is **per-service**: each invocation takes a single service
+`duynhdb` is **per-service**: each invocation takes a single service
 name (`bootstrap <svc>` / `migrate <svc>`). It creates one database + two roles
 (`app`, `migrator`) for that service and stores the generated app-role password
 in `/etc/duynhlab/<svc>.env`.
@@ -91,11 +91,11 @@ backend services:
 export SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres"
 
 for svc in auth user product cart order review notification shipping; do
-  sudo -E duynhlab-db-setup bootstrap "$svc"
+  sudo -E duynhdb bootstrap "$svc"
 done
 
 for svc in auth user product cart order review notification shipping; do
-  sudo duynhlab-db-setup migrate "$svc"
+  sudo duynhdb migrate "$svc"
 done
 ```
 
@@ -110,8 +110,8 @@ sudo systemctl enable --now duynhlab-platform.target
 Verify:
 
 ```bash
-duynhlab-ctl status            # per-service status table
-duynhlab-ctl ports             # listening port mapping
+duynhctl status            # per-service status table
+duynhctl ports             # listening port mapping
 curl -fsS http://localhost/health
 journalctl -u 'duynhlab-*' -e --no-pager
 ```
@@ -122,7 +122,7 @@ journalctl -u 'duynhlab-*' -e --no-pager
 sudo dnf upgrade -y duynhlab
 # Apply any new migrations shipped in the new RPM:
 for svc in auth user product cart order review notification shipping; do
-  sudo duynhlab-db-setup migrate "$svc"
+  sudo duynhdb migrate "$svc"
 done
 sudo systemctl restart duynhlab-platform.target
 ```
@@ -130,7 +130,7 @@ sudo systemctl restart duynhlab-platform.target
 Upgrades:
 
 - **Preserve** `/etc/duynhlab/*.env` and the database.
-- **Do not auto-migrate.** Always run `duynhlab-db-setup migrate <svc>` after an
+- **Do not auto-migrate.** Always run `duynhdb migrate <svc>` after an
   upgrade — a new binary may query tables/columns its embedded migrations have
   not created yet, failing at runtime with SQL errors. (`SCHEMA_VERSION` under
   `/opt/duynhlab/<svc>/` is audit metadata only — nothing blocks startup.)
@@ -176,16 +176,16 @@ sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;" ...
 ## Troubleshooting
 
 When contacting support, attach a diagnostics bundle —
-`sudo duynhlab-ctl support-bundle` collects journals, unit status, versions and
+`sudo duynhctl support-bundle` collects journals, unit status, versions and
 non-secret configs into one tarball (**your `*.env` secrets are never
 included**).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `dnf install` fails: `Curl error (60): SSL certificate problem` | Mirror reach is restricted | `dnf install --setopt=sslverify=false` once, then fix CA |
-| Service starts but logs SQL errors (missing table/column) after an upgrade | Forgot `duynhlab-db-setup migrate auth` | Run it, then `systemctl restart duynhlab-auth` |
+| Service starts but logs SQL errors (missing table/column) after an upgrade | Forgot `duynhdb migrate auth` | Run it, then `systemctl restart duynhlab-auth` |
 | `nginx -t` fails after install | Existing `nginx.conf` already defines `server { listen 80; }` | Edit `/etc/nginx/nginx.conf` to remove the default `server` block; ours lives in `conf.d/duynhlab.conf` |
-| `duynhlab-ctl status` shows `inactive (dead)` | DB unreachable or password wrong | `grep DB_PASSWORD /etc/duynhlab/<svc>.env`, verify via `psql` |
+| `duynhctl status` shows `inactive (dead)` | DB unreachable or password wrong | `grep DB_PASSWORD /etc/duynhlab/<svc>.env`, verify via `psql` |
 
 ## Local-mirror testing
 

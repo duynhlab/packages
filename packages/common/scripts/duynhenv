@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# duynhlab-gen-env <service>
+# duynhenv <service>
 #
 # Render /etc/duynhlab/<svc>.env from /opt/duynhlab/secret-tpl/<svc>.env.tpl
 # substituting __DB_PASSWORD__ with a fresh random 32-char string.
@@ -9,7 +9,7 @@ set -eu
 PROG=${0##*/}
 TPL_DIR=${TPL_DIR:-/opt/duynhlab/secret-tpl}
 ETC=${ETC:-/etc/duynhlab}
-GEN_PASS=${GEN_PASS:-/opt/duynhlab/lib/duynhlab-gen-password}
+GEN_PASS=${GEN_PASS:-/opt/duynhlab/lib/duynhpass}
 
 force=0
 svc=""

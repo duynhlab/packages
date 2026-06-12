@@ -1,5 +1,5 @@
-# bash completion for duynhlab-ctl
-_duynhlab_ctl() {
+# bash completion for duynhctl
+_duynhctl() {
   local cur prev words cword
   _init_completion || return
 
@@ -22,4 +22,4 @@ _duynhlab_ctl() {
       COMPREPLY=( $(compgen -W "$svcs" -- "$cur") ) ;;
   esac
 }
-complete -F _duynhlab_ctl duynhlab-ctl
+complete -F _duynhctl duynhctl

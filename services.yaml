@@ -10,7 +10,7 @@
 #   build_path    Go package main path (default ./cmd)
 #   port          HTTP listen port. INJECTED as PORT= into <svc>.env. Every service
 #                 defaults to 8080 in code, so on a shared host this override is
-#                 MANDATORY to avoid collision (also used by duynhlab-ctl health).
+#                 MANDATORY to avoid collision (also used by duynhctl health).
 #   grpc_port     gRPC listen port. INJECTED as GRPC_PORT= into <svc>.env. Only set
 #                 for services that run a gRPC server (default 9090 in code →
 #                 collides on a shared host). Omit for HTTP-only services.
@@ -21,7 +21,7 @@
 # Migrations: each backend EMBEDS its own SQL (go:embed) and runs them via its own
 # `<binary> migrate` subcommand (golang-migrate v4 through duynhlab/pkg/migratex,
 # forward-only *.up.sql). The packages repo does NOT ship loose SQL or a separate
-# migrate binary — see plan.md D23/D24. `duynhlab-db-setup <svc> migrate` just execs
+# migrate binary — see plan.md D23/D24. `duynhdb <svc> migrate` just execs
 # `<binary> migrate` with the migrator DB_USER/DB_PASSWORD in the environment.
 #
 # DB env vars read by every backend (no DATABASE_URL): DB_HOST, DB_PORT (5432),
