@@ -102,6 +102,9 @@ journalctl -u 'duynhlab-*' -e --no-pager      # all logs
 
 ## 5. Configuration
 
+> Full list of every config file the RPM installs or generates (including the
+> nginx/valkey/postgresql/logrotate drops): [`007-file-reference.md`](007-file-reference.md).
+
 ### Layering — how a service gets its environment
 
 Every `duynhlab-<svc>.service` unit loads three files **in order; a later file

@@ -61,4 +61,5 @@ releases**, so `dnf downgrade duynhlab` works. Details + rationale:
 | [`docs/004-build.md`](docs/004-build.md) | Build pipeline, scripts, Makefile, CI workflows, publishing |
 | [`docs/005-release.md`](docs/005-release.md) | Release runbook: cut, same-day hotfix, re-publish, rollback, audit |
 | [`docs/006-add-service.md`](docs/006-add-service.md) | Onboarding a new service: prerequisites, registry entry, touch-point checklist |
+| [`docs/007-file-reference.md`](docs/007-file-reference.md) | Reference: every installed file (binaries, configs, units), who creates it, upgrade behavior |
 | [`AGENTS.md`](AGENTS.md) | Repository layout, conventions, contributor/agent guide |

@@ -64,6 +64,9 @@ flowchart TB
 
 ## 3. Filesystem layout (FHS)
 
+> Per-file inventory (owner/mode, what creates each file, upgrade behavior):
+> [`007-file-reference.md`](007-file-reference.md).
+
 ```
 /opt/duynhlab/                      Immutable payload (owned by package)
 ├── <svc>/
