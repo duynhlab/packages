@@ -69,7 +69,7 @@ packages/
     ├── secret-tpl/            <svc>.env.tpl (PORT/GRPC_PORT/DB_*; __DB_PASSWORD__ placeholder)
     ├── nginx/ valkey/ postgresql/ logrotate/   config templates
     └── lib/                   init-service.sh, password-generator.sh
-docs/                          numbered reading order: 001-architecture … 006-add-service (see docs/README.md)
+docs/                          numbered reading order: 001-architecture … 006-add-service + 007-file-reference lookup (see docs/README.md)
 .github/workflows/             _build-test.yml (reusable pipeline), build.yml (validate — calls it),
                                release.yml (tag-driven publish — calls it too)
 build/  dist/                  Generated, gitignored — never hand-edit
