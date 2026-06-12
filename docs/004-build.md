@@ -204,7 +204,7 @@ from `python3 -m http.server`.
 1. Add an entry to [`services.yaml`](../services.yaml) (name, repo, port, type,
    and `database` if it needs one).
 2. `make fetch-sources build-local-all build` — units, staging tree, and
-   `duynhlab-ctl` pick it up automatically.
+   `duynhctl` pick it up automatically.
 3. Update the hard-coded service loop in
    [`packages/rpm/duynhlab.spec`](../packages/rpm/duynhlab.spec) `%check`/`%post` if the new
    service is a backend (the spec lists the eight backends explicitly).

@@ -39,7 +39,7 @@ Requires:       coreutils
 Requires:       nginx >= 1.20
 Requires:       postgresql >= 14
 Requires:       valkey >= 7.2
-# mikefarah yq (EPEL ≥4.47 on EL9) — duynhlab-ctl parses services.yaml with it.
+# mikefarah yq (EPEL ≥4.47 on EL9) — duynhctl parses services.yaml with it.
 # EPEL is already a documented prerequisite (valkey lives there too).
 Requires:       yq >= 4
 Requires(pre):  shadow-utils
@@ -57,15 +57,15 @@ duynhlab e-commerce platform — single mega-RPM containing:
   * 8 Go backend services (auth, user, product, cart, order, review,
     notification, shipping) under /opt/duynhlab/<svc>/bin/
   * Frontend SPA (static dist) under /opt/duynhlab/frontend/dist/
-  * CLI tools: duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env,
-    duynhlab-gen-password
+  * CLI tools: duynhctl, duynhdb, duynhenv,
+    duynhpass
   * Per-service systemd units + duynhlab-platform.target + duynhlab-infra.target
   * Template configs for nginx, valkey, postgresql, logrotate
   * Idempotent init-service.sh that drops configs into /etc/ on first install
   * Random password generation on first install (preserved on upgrade)
 
 Install:  dnf install duynhlab
-Bootstrap: duynhlab-db-setup bootstrap <svc> && duynhlab-db-setup migrate <svc>
+Bootstrap: duynhdb bootstrap <svc> && duynhdb migrate <svc>
            (migrate runs the service binary's own embedded migrations)
 Start:    systemctl enable --now duynhlab-platform.target
 
@@ -90,15 +90,15 @@ cp -a opt/duynhlab/. %{buildroot}%{duynhlab_prefix}/
 cp -a systemd/. %{buildroot}%{_unitdir}/
 
 # 3. /usr/bin symlinks to /opt/duynhlab/lib/* CLI tools
-for tool in duynhlab-ctl duynhlab-db-setup \
-            duynhlab-gen-env duynhlab-gen-password; do
+for tool in duynhctl duynhdb \
+            duynhenv duynhpass; do
   ln -sf %{duynhlab_prefix}/lib/$tool %{buildroot}%{_bindir}/$tool
 done
 
 # 4. Bash completion (optional, ship if exists)
-if [ -f opt/duynhlab/lib/duynhlab-ctl.bash-completion ]; then
-  install -Dm 0644 opt/duynhlab/lib/duynhlab-ctl.bash-completion \
-    %{buildroot}%{_datadir}/bash-completion/completions/duynhlab-ctl
+if [ -f opt/duynhlab/lib/duynhctl.bash-completion ]; then
+  install -Dm 0644 opt/duynhlab/lib/duynhctl.bash-completion \
+    %{buildroot}%{_datadir}/bash-completion/completions/duynhctl
 fi
 
 %check
@@ -177,16 +177,16 @@ cat <<'EOF'
 
     # 1. Bootstrap PostgreSQL (one-time, per service):
     SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \
-      duynhlab-db-setup bootstrap auth
+      duynhdb bootstrap auth
 
     # 2. Run migrations (runs the service binary's embedded migrations):
-    duynhlab-db-setup migrate auth
+    duynhdb migrate auth
 
     # 3. Start platform:
     systemctl enable --now duynhlab-platform.target
 
     # 4. Verify:
-    duynhlab-ctl status
+    duynhctl status
     curl http://localhost/health
 ================================================================
 EOF
@@ -240,13 +240,13 @@ exit 0
 %{duynhlab_prefix}/lib
 
 # /usr/bin symlinks
-%{_bindir}/duynhlab-ctl
-%{_bindir}/duynhlab-db-setup
-%{_bindir}/duynhlab-gen-env
-%{_bindir}/duynhlab-gen-password
+%{_bindir}/duynhctl
+%{_bindir}/duynhdb
+%{_bindir}/duynhenv
+%{_bindir}/duynhpass
 
 # Optional bash completion
-%{_datadir}/bash-completion/completions/duynhlab-ctl
+%{_datadir}/bash-completion/completions/duynhctl
 
 # Systemd units
 %{_unitdir}/duynhlab-infra.target

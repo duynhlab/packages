@@ -8,11 +8,11 @@
 # In the app container we:
 #   1. install epel + nginx + valkey + postgresql client
 #   2. dnf localinstall the mega-RPM
-#   3. duynhlab-db-setup <svc> bootstrap   (loop services with DB)
-#   4. duynhlab-db-setup <svc> migrate
+#   3. duynhdb <svc> bootstrap   (loop services with DB)
+#   4. duynhdb <svc> migrate
 #   5. systemctl start duynhlab-platform.target
 #   6. curl localhost:<port>/health for every backend
-#   7. duynhlab-ctl status / logs sanity
+#   7. duynhctl status / logs sanity
 #   8. shutdown
 #
 # Requires: podman with cgroup v2 + `--systemd=true` support (default on
@@ -161,9 +161,9 @@ for svc in "${BACKENDS[@]}"; do
   exec_app "
     set -e
     SUPERUSER_DSN='postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/postgres?sslmode=disable' \
-      duynhlab-db-setup bootstrap $svc
-    duynhlab-db-setup migrate $svc
-    duynhlab-db-setup status   $svc
+      duynhdb bootstrap $svc
+    duynhdb migrate $svc
+    duynhdb status   $svc
   "
 done
 log_ok "DB bootstrap + migrate OK"
@@ -194,9 +194,9 @@ for svc in "${BACKENDS[@]}"; do
   fi
 done
 
-# ── 7. duynhlab-ctl sanity ────────────────────────────────────────────────────
-log_step "duynhlab-ctl status / ports"
-exec_app 'duynhlab-ctl status || true; echo ; duynhlab-ctl ports || true'
+# ── 7. duynhctl sanity ────────────────────────────────────────────────────
+log_step "duynhctl status / ports"
+exec_app 'duynhctl status || true; echo ; duynhctl ports || true'
 
 # ── 8. Clean shutdown ─────────────────────────────────────────────────────────
 log_step "systemctl stop duynhlab-platform.target"

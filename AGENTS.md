@@ -61,7 +61,7 @@ scripts/                       Build / render / ops scripts
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
 └── test-install.sh / test-integration.sh   install / integration tests
 packages/
-├── common/scripts/            duynhlab-ctl, duynhlab-db-setup, duynhlab-gen-env, duynhlab-gen-password
+├── common/scripts/            duynhctl, duynhdb, duynhenv, duynhpass
 └── rpm/
     ├── duynhlab.spec          The mega-RPM SPEC (rpmbuild) — lives with the assets it packages
     ├── systemd/               duynhlab-service.tmpl.service, *.target(.tmpl)
@@ -85,8 +85,8 @@ independent per-service versioning.
 
 - Payload lands under `/opt/duynhlab/` (immutable, replaced each upgrade).
 - CLI tooling ships to `/opt/duynhlab/lib/` with `/usr/bin/` symlinks:
-  `duynhlab-ctl` (service ops), `duynhlab-db-setup` (DB bootstrap/migrate/status),
-  `duynhlab-gen-env`, `duynhlab-gen-password`.
+  `duynhctl` (service ops), `duynhdb` (DB bootstrap/migrate/status),
+  `duynhenv`, `duynhpass`.
 - systemd: each `duynhlab-<svc>.service` is `PartOf=duynhlab-platform.target` and ordered
   `After=duynhlab-infra.target` (which `Wants=` external `nginx`/`postgresql`/`valkey`).
 - Each unit loads env in order: `env-global.properties` → `<svc>.env` (required) → `<svc>.override`.
@@ -151,13 +151,13 @@ come pre-built from the service repos.
   `duynhlab_<svc>_app` (runtime CRUD), `duynhlab_<svc>_migrator` (DDL).
 - **Migrations:** embedded in each service binary (`//go:embed`, golang-migrate v4 via
   `duynhlab/pkg/migratex`, forward-only `000NNN_*.up.sql`). Run by the binary itself:
-  `duynhlab-db-setup <svc> migrate` execs `/opt/duynhlab/<svc>/bin/<binary> migrate`. This repo ships
+  `duynhdb <svc> migrate` execs `/opt/duynhlab/<svc>/bin/<binary> migrate`. This repo ships
   **no** loose SQL and **no** separate migrate tool (D23/D24).
 - **Env vars:** `DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_SSLMODE DB_POOL_*`, plus `PORT` and (for
   gRPC services) `GRPC_PORT`. No `DATABASE_URL`. `secret-tpl/<svc>.env.tpl` uses the `__DB_PASSWORD__`
   placeholder, substituted at install.
-- **Ops CLI:** `duynhlab-ctl {list,start,stop,restart,status,enable,disable,logs,health,version,config,ports}`;
-  `duynhlab-db-setup <svc> {bootstrap,migrate,status}` (`bootstrap` needs `SUPERUSER_DSN`).
+- **Ops CLI:** `duynhctl {list,start,stop,restart,status,enable,disable,logs,health,version,config,ports}`;
+  `duynhdb <svc> {bootstrap,migrate,status}` (`bootstrap` needs `SUPERUSER_DSN`).
 
 ## Testing
 
@@ -189,7 +189,7 @@ come pre-built from the service repos.
 - **Every service defaults to HTTP `8080` and gRPC `9090` in code.** On a shared host they collide, so
   `PORT`/`GRPC_PORT` MUST be set per service from `services.yaml` (`port`, `grpc_port`).
 - **Env path is flat:** `/etc/duynhlab/<svc>.env`.
-- **`duynhlab-ctl`'s `yq` comes via `Requires: yq >= 4`** (EPEL ships mikefarah yq ≥4.47 on EL9 —
+- **`duynhctl`'s `yq` comes via `Requires: yq >= 4`** (EPEL ships mikefarah yq ≥4.47 on EL9 —
   historically it was the unrelated python-yq, so re-verify if the floor ever changes). Don't bundle
   a private copy; the ctl resolver prefers `/opt/duynhlab/lib/yq` only as an escape hatch (B6).
   **Build machines need mikefarah yq too** (`yq_bin()` in `scripts/lib/common.sh` parses

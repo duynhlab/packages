@@ -21,7 +21,7 @@ sudo dnf install -y duynhlab
 ```
 
 Then bootstrap the per-service databases and start the platform — full steps
-(prerequisites, per-service `duynhlab-db-setup bootstrap`/`migrate`, verify,
+(prerequisites, per-service `duynhdb bootstrap`/`migrate`, verify,
 upgrade, remove): [`docs/002-install.md`](docs/002-install.md).
 
 ### Build locally (maintainer)
@@ -57,7 +57,7 @@ releases**, so `dnf downgrade duynhlab` works. Details + rationale:
 |---|---|
 | [`docs/001-architecture.md`](docs/001-architecture.md) | What ships in the package, FHS layout, systemd model, lifecycle |
 | [`docs/002-install.md`](docs/002-install.md) | End-user install, bootstrap, upgrade, downgrade, remove, troubleshooting |
-| [`docs/003-operations.md`](docs/003-operations.md) | `duynhlab-ctl`, `duynhlab-db-setup`, systemd targets, day-2 ops |
+| [`docs/003-operations.md`](docs/003-operations.md) | `duynhctl`, `duynhdb`, systemd targets, day-2 ops |
 | [`docs/004-build.md`](docs/004-build.md) | Build pipeline, scripts, Makefile, CI workflows, publishing |
 | [`docs/005-release.md`](docs/005-release.md) | Release runbook: cut, same-day hotfix, re-publish, rollback, audit |
 | [`docs/006-add-service.md`](docs/006-add-service.md) | Onboarding a new service: prerequisites, registry entry, touch-point checklist |

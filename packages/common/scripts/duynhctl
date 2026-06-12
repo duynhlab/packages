@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# duynhlab-ctl — operational wrapper around systemctl/journalctl for duynhlab services.
+# duynhctl — operational wrapper around systemctl/journalctl for duynhlab services.
 #
 # Commands:
 #   list                        List all services declared in services.yaml

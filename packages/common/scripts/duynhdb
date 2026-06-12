@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# duynhlab-db-setup — manage per-service PostgreSQL databases on duynhlab hosts.
+# duynhdb — manage per-service PostgreSQL databases on duynhlab hosts.
 #
 # Subcommands:
 #   bootstrap <svc>   CREATE DATABASE + CREATE USER + GRANT (needs SUPERUSER_DSN)
