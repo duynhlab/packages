@@ -20,20 +20,25 @@ single package.
 
 ## Prerequisites
 
-Install once on the target host:
+The RPM declares `Requires:` for nginx, the PostgreSQL **client**, and valkey,
+so `dnf install duynhlab` (next section) pulls them in for you. You only need to
+make those packages resolvable, and — if PostgreSQL runs on the same host —
+initialise the server:
 
 ```bash
+# 1. Enable EPEL — provides valkey and yq (duynhctl's YAML parser).
 sudo dnf install -y epel-release
+
+# 2. Same-host PostgreSQL only — install and initialise the server.
+#    Skip this entirely if your database lives on another host.
 sudo dnf module enable -y postgresql:16
-sudo dnf install -y \
-  nginx \
-  valkey \
-  postgresql      # client only; the server may live on another host
+sudo dnf install -y postgresql-server
+sudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql
 ```
 
-
-If PostgreSQL is on the same host, also install `postgresql-server` and run
-`postgresql-setup --initdb && systemctl enable --now postgresql`.
+> Don't hand-install nginx / valkey / the `postgresql` client — they are RPM
+> `Requires` and get pulled automatically once EPEL is enabled.
 
 ## 1. Add the repository
 
