@@ -20,9 +20,14 @@ sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo \
 sudo dnf install -y duynhlab
 ```
 
-Then bootstrap the per-service databases and start the platform — full steps
-(prerequisites, per-service `duynhdb bootstrap`/`migrate`, verify,
-upgrade, remove): [`docs/002-install.md`](docs/002-install.md).
+Then start the platform — the database bootstraps itself (a one-shot unit
+creates every per-service DB + roles and runs migrations before the backends
+start). Full steps (prerequisites, remote-DB `bootstrap.env`, verify, upgrade,
+remove): [`docs/002-install.md`](docs/002-install.md).
+
+```bash
+sudo systemctl enable --now duynhlab-platform.target
+```
 
 ### Build locally (maintainer)
 

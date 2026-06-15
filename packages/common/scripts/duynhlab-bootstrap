@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# duynhlab-bootstrap — one-time, idempotent DB bootstrap + migrate for every
+# backend. Invoked by duynhlab-bootstrap.service before the platform starts; not
+# a user CLI (no /usr/bin symlink). Safe to re-run: `duynhdb bootstrap` is all
+# IF NOT EXISTS and `migrate` is forward-only (no-op when up to date).
+#
+# DB superuser access:
+#   - SUPERUSER_DSN set (via /etc/duynhlab/bootstrap.env) → remote/explicit DB.
+#   - unset                                               → local peer auth as
+#     the postgres OS user (same-host PostgreSQL). See duynhdb.
+set -euo pipefail
+
+ETC_BASE=${ETC_BASE:-/etc/duynhlab}
+DUYNHDB=${DUYNHDB:-/usr/bin/duynhdb}
+BACKENDS=(auth user product cart order review notification shipping)
+
+log() { printf '[duynhlab-bootstrap] %s\n' "$*"; }
+
+# bootstrap.env may export SUPERUSER_DSN for a remote DB; absent = local peer.
+# shellcheck disable=SC1091
+[ -f "$ETC_BASE/bootstrap.env" ] && . "$ETC_BASE/bootstrap.env"
+export SUPERUSER_DSN="${SUPERUSER_DSN:-}"
+
+# ── Wait for PostgreSQL to accept connections ────────────────────────────────
+# pg_isready against the explicit DSN (remote) or the local socket (peer).
+ready=
+for i in $(seq 1 60); do
+  if [ -n "$SUPERUSER_DSN" ]; then
+    pg_isready -d "$SUPERUSER_DSN" >/dev/null 2>&1 && { ready=1; break; }
+  else
+    pg_isready >/dev/null 2>&1 && { ready=1; break; }
+  fi
+  log "waiting for PostgreSQL to come up ($i/60)…"
+  sleep 5
+done
+if [ -z "$ready" ]; then
+  log "PostgreSQL never became ready."
+  if [ -z "$SUPERUSER_DSN" ]; then
+    log "No local PostgreSQL and no SUPERUSER_DSN — set it in $ETC_BASE/bootstrap.env for a remote DB."
+  fi
+  exit 1
+fi
+
+# ── Bootstrap + migrate every backend (idempotent) ───────────────────────────
+for svc in "${BACKENDS[@]}"; do
+  log "bootstrap $svc"
+  "$DUYNHDB" bootstrap "$svc"
+  log "migrate $svc"
+  "$DUYNHDB" migrate "$svc"
+done
+
+log "all backends bootstrapped + migrated"
