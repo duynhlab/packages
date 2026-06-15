@@ -26,7 +26,7 @@ make those packages resolvable, and — if PostgreSQL runs on the same host —
 initialise the server:
 
 ```bash
-# 1. Enable EPEL — provides valkey and yq (duynhctl's YAML parser).
+# 1. Enable EPEL — provides valkey on EL9.
 sudo dnf install -y epel-release
 
 # 2. Same-host PostgreSQL only — install and initialise the server.

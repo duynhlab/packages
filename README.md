@@ -8,7 +8,7 @@ GitHub Pages (metadata) + GitHub Releases (RPM assets).
 - **Format**: RPM (EL9 / Rocky · AlmaLinux · RHEL 9, `x86_64`)
 - **Build tool**: `rpmbuild` against [`packages/rpm/duynhlab.spec`](packages/rpm/duynhlab.spec) — no nFPM, no Docker build image
 - **Output**: `duynhlab-<VERSION>-1.el9.x86_64.rpm` (8 backends + frontend + CLI + config templates)
-- **Source of truth**: [`services.yaml`](services.yaml) — every script and workflow renders from it
+- **Source of truth**: the service registry hardcoded in [`scripts/lib/common.sh`](scripts/lib/common.sh) — every build script reads it
 
 ## Quick start
 

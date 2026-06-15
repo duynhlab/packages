@@ -7,9 +7,9 @@ databases, and troubleshooting. All commands assume `root` (or `sudo`).
 
 ## 1. `duynhctl` — service control
 
-A thin, safe wrapper around `systemctl`/`journalctl` that knows the service
-list from `/etc/duynhlab/services.yaml` (parsed with mikefarah `yq`, which the
-RPM pulls automatically via `Requires: yq` — no manual install needed).
+A thin, safe wrapper around `systemctl`/`journalctl` that discovers the service
+list from the installed payload (`/opt/duynhlab/*/`) and reads each service's
+`PORT` from `/etc/duynhlab/<svc>.env` — no registry file and no `yq` needed.
 
 ```
 duynhctl <command> [svc|all] [args]
@@ -17,7 +17,7 @@ duynhctl <command> [svc|all] [args]
 
 | Command | Example | Description |
 |---|---|---|
-| `list` | `duynhctl list` | List all services from `services.yaml` |
+| `list` | `duynhctl list` | List all installed services |
 | `status` | `duynhctl status all` | systemd status table |
 | `start` | `duynhctl start auth` | Start service(s) |
 | `stop` | `duynhctl stop all` | Stop service(s) |

@@ -39,9 +39,6 @@ Requires:       coreutils
 Requires:       nginx >= 1.20
 Requires:       postgresql >= 14
 Requires:       valkey >= 7.2
-# mikefarah yq (EPEL ≥4.47 on EL9) — duynhctl parses services.yaml with it.
-# EPEL is already a documented prerequisite (valkey lives there too).
-Requires:       yq >= 4
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/bin/getent
 %{?systemd_requires}
@@ -262,7 +259,6 @@ exit 0
 
 # /etc/duynhlab — managed by init-service.sh + password-generator.sh
 %dir %attr(0755, root, %{duynhlab_group}) %{duynhlab_etc}
-%ghost %attr(0644, root, root)            %{duynhlab_etc}/services.yaml
 %ghost %attr(0644, root, root)            %{duynhlab_etc}/env-global.properties
 %ghost %attr(0644, root, root)            %{duynhlab_etc}/secret_version.properties
 %ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/auth.env

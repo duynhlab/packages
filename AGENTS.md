@@ -4,7 +4,8 @@ Guide for AI agents and contributors working on `duynhlab/packages`.
 
 > **Source of truth:** [`plan-spec.md`](./plan-spec.md) holds the locked decisions (S-D1…S-D17),
 > the roadmap status, and the Backlog of undecided items. It is gitignored (internal). **Read it
-> before any structural change.** `services.yaml` is the source of truth for the service list.
+> before any structural change.** The service list is hardcoded in the registry block of
+> [`scripts/lib/common.sh`](./scripts/lib/common.sh).
 
 ## Contribution workflow for AI agents
 
@@ -49,13 +50,13 @@ amd64.
 ## Repository layout
 
 ```
-services.yaml                  Single source of truth: every service (repo/binary/port/grpc_port/db/deps)
 Makefile                       Local entrypoint (fetch-sources, build-local, stage, build, test-install, …)
 scripts/                       Build / render / ops scripts
-├── lib/common.sh              Shared bash helpers (yq accessors: svc_field, svc_build_env, logging)
+├── lib/common.sh              Hardcoded service registry (single source of truth: repo/binary/port/
+│                              grpc_port/db/deps) + accessors svc_list/svc_field/svc_build_env + logging
 ├── fetch-sources.sh           git clone/pull each service repo
 ├── build-local.sh             Build one service (go build / npm build) → build/<svc>/raw/
-├── render-systemd.sh          services.yaml → per-service .service + duynhlab-platform.target
+├── render-systemd.sh          registry → per-service .service + duynhlab-platform.target
 ├── stage-all.sh               Assemble FHS payload → Source0 staging tarball
 ├── build-rpm.sh               rpmbuild packages/rpm/duynhlab.spec → dist/*.rpm (host/podman/docker)
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
@@ -65,7 +66,6 @@ packages/
 └── rpm/
     ├── duynhlab.spec          The mega-RPM SPEC (rpmbuild) — lives with the assets it packages
     ├── systemd/               duynhlab-service.tmpl.service, *.target(.tmpl)
-    ├── scriptlets/            %pre/%post/%postun fragments
     ├── secret-tpl/            <svc>.env.tpl (PORT/GRPC_PORT/DB_*; __DB_PASSWORD__ placeholder)
     ├── nginx/ valkey/ postgresql/ logrotate/   config templates
     └── lib/                   init-service.sh, password-generator.sh
@@ -93,7 +93,7 @@ independent per-service versioning.
 
 ## Build pipeline
 
-Three stages, all driven by `services.yaml`:
+Three stages, all driven by the hardcoded registry in `scripts/lib/common.sh`:
 
 1. **`build-local.sh <svc>`** — `cd $DUYNHLAB_SRC_ROOT/<src_dir>`, `go build` (backend,
    `CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm ci && npm run build` (frontend, with `build.env`
@@ -113,7 +113,7 @@ Three stages, all driven by `services.yaml`:
 make help                       # list targets + resolved env
 make fetch-sources [REF=main]   # clone/update all service repos under $DUYNHLAB_SRC_ROOT
 make build-local SERVICE=auth   # build one service
-make build-local-all            # build every service in services.yaml
+make build-local-all            # build every service in the registry
 make render-systemd             # render units only
 make stage                      # assemble Source0 staging tarball
 make build                      # stage + rpmbuild -> dist/
@@ -187,14 +187,15 @@ come pre-built from the service repos.
 - **Mega-RPM, not nFPM** (D27). `nfpm` is referenced nowhere; any `build/*/nfpm.yaml` are dead.
 - **`plan-spec.md` is the gitignored source of truth** — read it before structural changes.
 - **Every service defaults to HTTP `8080` and gRPC `9090` in code.** On a shared host they collide, so
-  `PORT`/`GRPC_PORT` MUST be set per service from `services.yaml` (`port`, `grpc_port`).
+  `PORT`/`GRPC_PORT` MUST be set per service from the registry (`port`, `grpc_port`) — they land in
+  `secret-tpl/<svc>.env.tpl`.
 - **Env path is flat:** `/etc/duynhlab/<svc>.env`.
-- **`duynhctl`'s `yq` comes via `Requires: yq >= 4`** (EPEL ships mikefarah yq ≥4.47 on EL9 —
-  historically it was the unrelated python-yq, so re-verify if the floor ever changes). Don't bundle
-  a private copy; the ctl resolver prefers `/opt/duynhlab/lib/yq` only as an escape hatch (B6).
-  **Build machines need mikefarah yq too** (`yq_bin()` in `scripts/lib/common.sh` parses
-  `services.yaml` during builds) — the spec's `Requires:` does NOT cover them; CI installs it in
-  `_build-test.yml`, devs install it once. Don't delete `yq_bin()` thinking the spec replaced it.
+- **No `yq`, no `services.yaml`.** The service registry is hardcoded in `scripts/lib/common.sh`
+  (accessors `svc_list`/`svc_field`/`svc_field_list`/`svc_build_env`), and `duynhctl` discovers
+  services at runtime from the filesystem (`/opt/duynhlab/*/`) + `PORT` in `/etc/duynhlab/<svc>.env`.
+  The RPM has **no** `Requires: yq` and build machines need no yq. Adding/removing a service = edit the
+  registry block + `secret-tpl/<svc>.env.tpl` + `nginx/duynhlab.conf` + the hardcoded service loops in
+  the spec and `init-service.sh` (see `docs/006-add-service.md`).
 - **Frontend `VITE_API_BASE_URL` is baked at build time** — changing the gateway origin requires a
   rebuild.
 - **Never co-locate two services in one database** — golang-migrate's unqualified `schema_migrations`

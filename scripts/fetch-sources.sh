@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# fetch-sources.sh — Clone every service repo from services.yaml into
-# $DUYNHLAB_SRC_ROOT (default: ../) so build-local.sh can compile them.
+# fetch-sources.sh — Clone every service repo in the hardcoded registry
+# (scripts/lib/common.sh) into $DUYNHLAB_SRC_ROOT (default: ../) so
+# build-local.sh can compile them.
 #
 # Usage: scripts/fetch-sources.sh [ref]
 #   ref   git ref to check out (default: main)

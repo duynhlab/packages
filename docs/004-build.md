@@ -1,7 +1,8 @@
 # Build & Release
 
 How a commit becomes an installable RPM in the YUM repo. The whole pipeline is
-driven by [`services.yaml`](../services.yaml) and produces a single
+driven by the hardcoded service registry in
+[`scripts/lib/common.sh`](../scripts/lib/common.sh) and produces a single
 `duynhlab-<VERSION>-1.el9.x86_64.rpm`.
 
 ---
@@ -10,7 +11,7 @@ driven by [`services.yaml`](../services.yaml) and produces a single
 
 ```mermaid
 flowchart TD
-  YML[services.yaml] --> FS[fetch-sources.sh]
+  YML[registry<br/>scripts/lib/common.sh] --> FS[fetch-sources.sh]
   FS -->|git clone/pull| SRC[(../&lt;svc&gt;-service)]
   SRC --> BL[build-local.sh]
   BL -->|go build / npm build<br/>+ tar + sha256| RAW[build/&lt;svc&gt;/raw/]
@@ -35,9 +36,9 @@ All scripts live in [`scripts/`](../scripts) and source
 
 | Script | Input | Output | Purpose |
 |---|---|---|---|
-| `fetch-sources.sh [ref]` | `services.yaml` | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` every service repo at `ref` (default `main`) |
+| `fetch-sources.sh [ref]` | registry (`common.sh`) | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` every service repo at `ref` (default `main`) |
 | `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/*.tar.gz` + `.sha256` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; tar binary + migrations |
-| `render-systemd.sh [outdir]` | `services.yaml` + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
+| `render-systemd.sh [outdir]` | registry (`common.sh`) + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree + generate the composition manifest (`etc/manifest`) → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba packages/rpm/duynhlab.spec` |
 | `publish-yum-repo.sh` | `dist/*.x86_64.rpm` | `build/gh-pages/` | `createrepo_c` + landing page + `duynhlab.repo` |
@@ -82,7 +83,7 @@ make help                     # list targets + show resolved env
 
 make fetch-sources REF=main   # clone/update all service repos
 make build-local SERVICE=auth # build a single service
-make build-local-all          # build every service in services.yaml
+make build-local-all          # build every service in the registry
 make render-systemd           # render units only
 make stage                    # build Source0 staging tarball
 make build                    # stage + rpmbuild -> dist/
@@ -201,10 +202,12 @@ from `python3 -m http.server`.
 
 ## 7. Adding a new service
 
-1. Add an entry to [`services.yaml`](../services.yaml) (name, repo, port, type,
-   and `database` if it needs one).
-2. `make fetch-sources build-local-all build` — units, staging tree, and
-   `duynhctl` pick it up automatically.
+1. Add an entry to the registry block in
+   [`scripts/lib/common.sh`](../scripts/lib/common.sh) (`_SVC_ORDER` + the `_SVC`
+   keys: repo, src_dir, binary, build_path, port, type, and `database.*` if it
+   needs one).
+2. `make fetch-sources build-local-all build` — units and the staging tree pick
+   it up; `duynhctl` discovers it at runtime from the installed payload.
 3. Update the hard-coded service loop in
    [`packages/rpm/duynhlab.spec`](../packages/rpm/duynhlab.spec) `%check`/`%post` if the new
    service is a backend (the spec lists the eight backends explicitly).

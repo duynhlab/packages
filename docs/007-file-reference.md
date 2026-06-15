@@ -65,7 +65,6 @@ Everything here is replaced wholesale on upgrade — never edit it in place.
 | `postgresql/duynhlab-tuning.conf` | PostgreSQL tuning template | payload |
 | `postgresql/bootstrap.sql` | DB/role bootstrap template, applied by `duynhdb bootstrap` | payload |
 | `logrotate/duynhlab-services`, `logrotate/duynhlab-nginx` | logrotate rule templates | payload |
-| `etc/services.yaml` | Service registry master copy | payload |
 | `etc/env-global.properties` | Global defaults master copy (`DUYNHLAB_VERSION`, `LOG_LEVEL`, `DB_HOST`…) | payload |
 | `etc/manifest` | Composition audit: 9 component commits/versions in this build | payload |
 
@@ -73,7 +72,6 @@ Everything here is replaced wholesale on upgrade — never edit it in place.
 
 | Path | Owner / mode | Created by | Notes |
 |---|---|---|---|
-| `services.yaml` | `root:root 0644` | init-service | Copy of the registry; read by `duynhctl`/`duynhdb`. Copy-if-missing — your edits stick |
 | `env-global.properties` | `root:root 0644` | init-service | Shared defaults, loaded first by every unit |
 | `<svc>.env` (×8) | `root:duynhlab 0640` | password-generator | Random 32-char `DB_PASSWORD`, `PORT`, `GRPC_PORT`…; `%ghost` — generated once, **never overwritten** |
 | `<svc>.override` | yours | operator | Optional; loaded last, wins. The RPM never creates or touches it |

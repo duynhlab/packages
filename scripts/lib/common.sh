@@ -7,7 +7,6 @@ set -euo pipefail
 # ── Repo paths ────────────────────────────────────────────────────────────────
 COMMON_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$COMMON_LIB_DIR/../.." && pwd)"
-SERVICES_YAML="${SERVICES_YAML:-$REPO_ROOT/services.yaml}"
 BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/build}"
 DIST_DIR="${DIST_DIR:-$REPO_ROOT/dist}"
 DUYNHLAB_SRC_ROOT="${DUYNHLAB_SRC_ROOT:-$(cd "$REPO_ROOT/.." && pwd)}"
@@ -34,51 +33,70 @@ require_cmd() {
   done
 }
 
-# ── services.yaml parser (mikefarah yq v4) ────────────────────────────────────
-# BUILD-TIME dependency — runs on the developer machine / CI runner that BUILDS
-# the RPM. Do not confuse it with the spec's `Requires: yq`, which only applies
-# to CUSTOMER hosts that INSTALL the RPM (it covers duynhctl at runtime and
-# does nothing for build machines).
-#   CI:  installed by .github/workflows/_build-test.yml (curl from GitHub —
-#        Ubuntu's `apt install yq` is the unrelated python-yq, wrong tool).
-#   Dev: install once: `go install github.com/mikefarah/yq/v4@latest` or grab
-#        the binary from https://github.com/mikefarah/yq/releases.
-yq_bin() {
-  if command -v yq >/dev/null 2>&1; then
-    echo yq
-  elif [[ -x "$(go env GOPATH 2>/dev/null)/bin/yq" ]]; then
-    echo "$(go env GOPATH)/bin/yq"
-  else
-    die "yq not found. Install: go install github.com/mikefarah/yq/v4@latest"
-  fi
-}
+# ── Service registry (hardcoded — single source of truth) ─────────────────────
+# Was parsed from services.yaml via yq; inlined here so the build needs no yq and
+# the RPM ships no registry file. Adding/removing a service = edit THIS block +
+# packages/rpm/secret-tpl/<svc>.env.tpl + packages/rpm/nginx/duynhlab.conf, plus
+# the hardcoded service loops in the spec/init-service.sh (see docs/006-add-service.md).
+#
+# Scalar fields are keyed "<name>|<field>" (only existing keys are set; a missing
+# key reads back as ""). svc_list prints names in _SVC_ORDER order.
+_SVC_ORDER=(auth user product cart order review notification shipping frontend)
 
-# svc_list — print every service name on its own line
-svc_list() {
-  "$(yq_bin)" '.services[].name' "$SERVICES_YAML"
-}
+declare -A _SVC=(
+  [auth|repo]=duynhlab/auth-service  [auth|src_dir]=auth-service  [auth|binary]=auth-service  [auth|build_path]=./cmd  [auth|port]=8001  [auth|grpc_port]=9001  [auth|type]=backend  [auth|database.name]=duynhlab_auth  [auth|database.app_user]=duynhlab_auth_app  [auth|database.migrator_user]=duynhlab_auth_migrator
+  [user|repo]=duynhlab/user-service  [user|src_dir]=user-service  [user|binary]=user-service  [user|build_path]=./cmd  [user|port]=8002  [user|type]=backend  [user|database.name]=duynhlab_user  [user|database.app_user]=duynhlab_user_app  [user|database.migrator_user]=duynhlab_user_migrator
+  [product|repo]=duynhlab/product-service  [product|src_dir]=product-service  [product|binary]=product-service  [product|build_path]=./cmd  [product|port]=8003  [product|type]=backend  [product|database.name]=duynhlab_product  [product|database.app_user]=duynhlab_product_app  [product|database.migrator_user]=duynhlab_product_migrator
+  [cart|repo]=duynhlab/cart-service  [cart|src_dir]=cart-service  [cart|binary]=cart-service  [cart|build_path]=./cmd  [cart|port]=8004  [cart|type]=backend  [cart|database.name]=duynhlab_cart  [cart|database.app_user]=duynhlab_cart_app  [cart|database.migrator_user]=duynhlab_cart_migrator
+  [order|repo]=duynhlab/order-service  [order|src_dir]=order-service  [order|binary]=order-service  [order|build_path]=./cmd  [order|port]=8005  [order|type]=backend  [order|database.name]=duynhlab_order  [order|database.app_user]=duynhlab_order_app  [order|database.migrator_user]=duynhlab_order_migrator
+  [review|repo]=duynhlab/review-service  [review|src_dir]=review-service  [review|binary]=review-service  [review|build_path]=./cmd  [review|port]=8006  [review|grpc_port]=9006  [review|type]=backend  [review|database.name]=duynhlab_review  [review|database.app_user]=duynhlab_review_app  [review|database.migrator_user]=duynhlab_review_migrator
+  [notification|repo]=duynhlab/notification-service  [notification|src_dir]=notification-service  [notification|binary]=notification-service  [notification|build_path]=./cmd  [notification|port]=8007  [notification|grpc_port]=9007  [notification|type]=backend  [notification|database.name]=duynhlab_notification  [notification|database.app_user]=duynhlab_notification_app  [notification|database.migrator_user]=duynhlab_notification_migrator
+  [shipping|repo]=duynhlab/shipping-service  [shipping|src_dir]=shipping-service  [shipping|binary]=shipping-service  [shipping|build_path]=./cmd  [shipping|port]=8008  [shipping|grpc_port]=9008  [shipping|type]=backend  [shipping|database.name]=duynhlab_shipping  [shipping|database.app_user]=duynhlab_shipping_app  [shipping|database.migrator_user]=duynhlab_shipping_migrator
+  [frontend|repo]=duynhlab/frontend  [frontend|src_dir]=frontend  [frontend|binary]=  [frontend|build_path]=  [frontend|port]=8080  [frontend|type]=static
+)
+
+# Array field dependencies.after (space-separated). Only set where non-empty;
+# dependencies.env_files is empty for every service today.
+declare -A _SVC_AFTER=(
+  [frontend]="nginx.service"
+)
+
+# build.env for static services (KEY=VALUE lines) — baked into the SPA at build time.
+declare -A _SVC_BUILDENV=(
+  [frontend]=$'VITE_API_BASE_URL=https://gateway.duynh.me\nVITE_USE_MOCK=false'
+)
+
+# svc_list — print every service name on its own line (registry order).
+svc_list() { printf '%s\n' "${_SVC_ORDER[@]}"; }
 
 # svc_field <name> <field-path>
 #   svc_field auth repo            -> duynhlab/auth-service
 #   svc_field auth database.name   -> duynhlab_auth
 svc_field() {
   local name=$1 field=$2
-  "$(yq_bin)" ".services[] | select(.name==\"$name\") | .${field} // \"\"" "$SERVICES_YAML"
+  printf '%s\n' "${_SVC[$name|$field]:-}"
 }
 
-# svc_field_list <name> <field-path>  — for array fields, one item per line
+# svc_field_list <name> <field-path> — for array fields, one item per line.
+# Always returns 0 (an empty list is not an error) so callers under
+# `set -e`/pipefail don't abort, matching the old `yq '...[]?'` behaviour.
 svc_field_list() {
   local name=$1 field=$2
-  "$(yq_bin)" ".services[] | select(.name==\"$name\") | .${field}[]?" "$SERVICES_YAML"
+  case "$field" in
+    dependencies.after)
+      local v=${_SVC_AFTER[$name]:-}
+      [[ -n $v ]] && printf '%s\n' $v ;;     # unquoted: split into one line each
+    dependencies.env_files) ;;               # none for any service
+  esac
+  return 0
 }
 
 # svc_build_env <name> — print KEY=VALUE lines from .build.env (static services).
 #   Used to bake Vite build-time vars (e.g. VITE_API_BASE_URL) before `npm run build`.
 svc_build_env() {
   local name=$1
-  "$(yq_bin)" -r \
-    ".services[] | select(.name==\"$name\") | .build.env // {} | to_entries | .[] | .key + \"=\" + .value" \
-    "$SERVICES_YAML"
+  [[ -n "${_SVC_BUILDENV[$name]:-}" ]] && printf '%s\n' "${_SVC_BUILDENV[$name]}"
+  return 0
 }
 
 svc_exists() {

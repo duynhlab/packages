@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# scripts/render-systemd.sh — render systemd unit + target files from services.yaml
+# scripts/render-systemd.sh — render systemd unit + target files from the
+# hardcoded service registry (scripts/lib/common.sh)
 # Output goes into build/systemd/<svc>.service and build/systemd/duynhlab-platform.target
 set -euo pipefail
 

@@ -28,7 +28,7 @@ for svc in "${BACKENDS[@]}"; do
 done
 install -d -m 0755 -o root -g root "$LOG/nginx"
 
-# ── 2. /etc/duynhlab/ — global config + services.yaml ────────────────────────
+# ── 2. /etc/duynhlab/ — global config ────────────────────────────────────────
 install -d -m 0755 -o root -g duynhlab "$ETC"
 
 copy_if_missing() {
@@ -39,7 +39,6 @@ copy_if_missing() {
   fi
 }
 
-copy_if_missing "$PREFIX/etc/services.yaml"          "$ETC/services.yaml"          0644 root:root
 copy_if_missing "$PREFIX/etc/env-global.properties"  "$ETC/env-global.properties"  0644 root:root
 
 # ── 3. nginx vhost ───────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
 # build/<service>/raw/, mimicking what fetch-release.sh will produce in CI.
 #
 # Usage: build-local.sh <service> [version]
-#   - Reads services.yaml for repo / binary / build_path / migrations
+#   - Reads the registry (scripts/lib/common.sh) for repo / binary / build_path
 #   - cd $DUYNHLAB_SRC_ROOT/<src_dir>
 #   - git fetch && checkout main && pull --ff-only (unless DUYNHLAB_NO_GIT=1)
 #   - go build (CGO=0, GOOS=linux GOARCH=amd64)
@@ -26,7 +26,7 @@ usage() {
 Usage: $0 <service> [version]
 
 Arguments:
-  service   Service name from services.yaml (e.g. auth, user, frontend)
+  service   Service name from the registry (e.g. auth, user, frontend)
   version   Optional semver/tag for filename (default: 0.0.0-local+<git-sha>)
 
 Environment:
@@ -41,7 +41,7 @@ EOF
 SERVICE=$1
 VERSION=${2:-}
 
-svc_exists "$SERVICE" || die "Service '$SERVICE' not in services.yaml"
+svc_exists "$SERVICE" || die "Service '$SERVICE' not in the registry (scripts/lib/common.sh)"
 
 require_cmd git tar
 GOOS=${GOOS:-linux}
@@ -130,7 +130,7 @@ case "$TYPE" in
 
   static)
     require_cmd npm
-    # Bake build-time env (e.g. VITE_API_BASE_URL) from services.yaml .build.env.
+    # Bake build-time env (e.g. VITE_API_BASE_URL) from the registry .build.env.
     # Vite inlines these at build time — they cannot be changed at runtime.
     BUILD_ENV=()
     while IFS= read -r kv; do

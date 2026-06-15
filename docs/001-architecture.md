@@ -31,7 +31,7 @@ flowchart TB
       FE["frontend/dist (SPA)"]
       LIB["lib/ — CLI tools + init-service.sh<br/>+ password-generator.sh"]
       TPL["nginx · valkey · postgresql<br/>logrotate · secret-tpl templates"]
-      ETCMETA["etc/services.yaml<br/>etc/env-global.properties"]
+      ETCMETA["etc/env-global.properties<br/>etc/manifest"]
     end
     UNITS["systemd units<br/>duynhlab-&lt;svc&gt;.service ×8<br/>duynhlab-platform.target<br/>duynhlab-infra.target"]
     BIN["/usr/bin symlinks<br/>duynhctl, duynhdb, …"]
@@ -40,12 +40,12 @@ flowchart TB
 
 | Component | Count | Notes |
 |---|---|---|
-| Backend services | 8 | Static Go binaries (`CGO_ENABLED=0`), one per `services.yaml` entry of `type: backend` |
+| Backend services | 8 | Static Go binaries (`CGO_ENABLED=0`), one per `type: backend` registry entry |
 | Frontend | 1 | `type: static`, npm build output served by nginx |
 | CLI tools | 4 | `duynhctl`, `duynhdb`, `duynhenv`, `duynhpass` |
 | systemd units | 8 + 2 targets | per-service `.service` + `duynhlab-platform.target` + `duynhlab-infra.target` |
 
-### Services (from `services.yaml`)
+### Services (from the registry in `scripts/lib/common.sh`)
 
 | Service | Port | DB | Extra `After=` |
 |---|---|---|---|
@@ -59,8 +59,10 @@ flowchart TB
 | shipping | 8008 | `duynhlab_shipping` | — |
 | frontend | — | — | static, served by nginx |
 
-> `services.yaml` is the single source of truth. Adding a service there +
-> rebuilding regenerates units, the staging tree, and `duynhctl` output.
+> The hardcoded registry in `scripts/lib/common.sh` is the single source of
+> truth. Adding a service there (+ its `secret-tpl`/nginx/spec touch-points) and
+> rebuilding regenerates units and the staging tree; `duynhctl` discovers it from
+> the installed payload at runtime.
 
 ## 3. Filesystem layout (FHS)
 
@@ -78,7 +80,6 @@ flowchart TB
 ├── nginx/ valkey/ postgresql/      Config templates (copied into /etc on install)
 ├── logrotate/ secret-tpl/
 └── etc/
-    ├── services.yaml               Runtime copy read by CLI tools
     ├── env-global.properties       Shared env (DB host, etc.)
     └── manifest                    Composition: the 9 service commits this
                                     build was made from (audit / release notes)

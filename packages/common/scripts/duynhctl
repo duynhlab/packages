@@ -2,7 +2,7 @@
 # duynhctl — operational wrapper around systemctl/journalctl for duynhlab services.
 #
 # Commands:
-#   list                        List all services declared in services.yaml
+#   list                        List all installed services
 #   start    <svc|all>          Start service(s)
 #   stop     <svc|all>          Stop service(s)
 #   restart  <svc|all>          Restart service(s)
@@ -18,7 +18,6 @@
 set -euo pipefail
 
 PROG=${0##*/}
-SERVICES_YAML=${SERVICES_YAML:-/etc/duynhlab/services.yaml}
 OPT_BASE=${OPT_BASE:-/opt/duynhlab}
 ETC_BASE=${ETC_BASE:-/etc/duynhlab}
 
@@ -30,19 +29,24 @@ fi
 
 die() { echo "$PROG: $*" >&2; exit 1; }
 
-# mikefarah yq — normally on PATH via the RPM's `Requires: yq` (EPEL ≥4.47).
-# A copy at $OPT_BASE/lib/yq takes precedence if present (escape hatch), and
-# YQ=… overrides everything.
-YQ=${YQ:-}
-if [[ -z "$YQ" ]]; then
-  if [[ -x "$OPT_BASE/lib/yq" ]]; then YQ="$OPT_BASE/lib/yq"; else YQ=yq; fi
-fi
-
-require_yq() { command -v "$YQ" >/dev/null 2>&1 || die "yq not found — install mikefarah yq (EPEL: dnf install yq)"; }
-
-list_services() { require_yq; "$YQ" '.services[].name' "$SERVICES_YAML"; }
-svc_port() { "$YQ" ".services[] | select(.name==\"$1\") | .port" "$SERVICES_YAML"; }
-svc_type() { "$YQ" ".services[] | select(.name==\"$1\") | .type" "$SERVICES_YAML"; }
+# Service discovery is registry-free: enumerate the payload directories under
+# /opt/duynhlab (a backend has bin/, the frontend has dist/) and read each
+# service's PORT from its /etc/duynhlab/<svc>.env. No services.yaml, no yq.
+list_services() {
+  local d name
+  for d in "$OPT_BASE"/*/; do
+    name=$(basename "$d")
+    case "$name" in
+      etc|lib|nginx|valkey|postgresql|secret-tpl|logrotate) continue ;;
+    esac
+    [[ -d "$d/bin" || -d "$d/dist" ]] && echo "$name"
+  done
+}
+svc_port() {
+  local f="$ETC_BASE/$1.env"
+  [[ -f "$f" ]] && sed -n 's/^PORT=//p' "$f" | head -1
+}
+svc_type() { [[ "$1" == "frontend" ]] && echo static || echo backend; }
 
 resolve_targets() {
   if [[ "$1" == "all" ]]; then list_services; else echo "$1"; fi
@@ -51,7 +55,6 @@ resolve_targets() {
 unit_name() { echo "duynhlab-$1.service"; }
 
 cmd_list() {
-  require_yq
   printf "%-15s %-10s %-6s %-10s\n" "NAME" "TYPE" "PORT" "STATUS"
   while read -r svc; do
     local typ port stat
@@ -114,7 +117,6 @@ cmd_config() {
 # Collect a diagnostics tarball for support. SECRETS ARE NEVER INCLUDED:
 # <svc>.env and <svc>.override are excluded wholesale (they carry DB passwords).
 cmd_support_bundle() {
-  require_yq
   local outdir=${1:-/tmp}
   local version stamp work name
   version=$(sed -n 's/^DUYNHLAB_VERSION=//p' "$ETC_BASE/env-global.properties" 2>/dev/null | head -1)
@@ -149,7 +151,6 @@ cmd_support_bundle() {
   done > "$work/$name/opt/binary-versions.txt" 2>/dev/null || :
 
   # Non-secret configs only. .env/.override are deliberately skipped.
-  cp -f "$ETC_BASE/services.yaml"          "$work/$name/etc/" 2>/dev/null || :
   cp -f "$ETC_BASE/env-global.properties"  "$work/$name/etc/" 2>/dev/null || :
   cp -f /etc/nginx/conf.d/duynhlab.conf    "$work/$name/etc/" 2>/dev/null || :
 
@@ -160,10 +161,14 @@ cmd_support_bundle() {
 }
 
 cmd_ports() {
-  require_yq
   local filter=${1:-}
-  "$YQ" -r ".services[] | [.name, .port, .type] | @tsv" "$SERVICES_YAML" \
-    | { [[ -n "$filter" ]] && grep -i "$filter" || cat; } \
+  {
+    local p
+    while read -r svc; do
+      p=$(svc_port "$svc")
+      printf '%s\t%s\t%s\n' "$svc" "${p:--}" "$(svc_type "$svc")"
+    done < <(list_services)
+  } | { [[ -n "$filter" ]] && grep -i "$filter" || cat; } \
     | column -t
 }
 

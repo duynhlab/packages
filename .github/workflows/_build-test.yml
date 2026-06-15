@@ -66,11 +66,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq gettext-base curl tar
-          # mikefarah yq v4 (build scripts parse services.yaml with it)
-          sudo curl -fsSL -o /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          yq --version
+          # No yq: the service registry is hardcoded in scripts/lib/common.sh.
 
       - name: Resolve version
         run: |
@@ -87,7 +83,7 @@ jobs:
         working-directory: packages
         run: |
           set -euo pipefail
-          for svc in $(yq '.services[].name' services.yaml); do
+          for svc in $(bash -c '. scripts/lib/common.sh && svc_list'); do
             echo "::group::build-local $svc"
             ./scripts/build-local.sh "$svc" "$VERSION"
             echo "::endgroup::"
