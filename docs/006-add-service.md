@@ -1,9 +1,10 @@
 # Adding a New Service
 
 How to onboard a new backend service (example used throughout: `payments`,
-HTTP port **8009**) into the mega-RPM. [`services.yaml`](../services.yaml) is
-the declared source of truth, but several places still hardcode the service
-list — §3 is the honest checklist of every one of them.
+HTTP port **8009**) into the mega-RPM. The build-time registry in
+[`scripts/lib/common.sh`](../scripts/lib/common.sh) drives the build pipeline,
+but several other places hardcode the service list too — §3 is the honest
+checklist of every one of them.
 
 ## 1. Service repo prerequisites
 
@@ -24,33 +25,27 @@ conventions or the pipeline can't build/run it:
   the integration test poll it.
 - Logs to stdout/stderr (journald captures them).
 
-## 2. The declarative step — `services.yaml`
+## 2. The registry step — `scripts/lib/common.sh`
 
-```yaml
-  - name: payments
-    repo: duynhlab/payments-service
-    src_dir: payments-service
-    binary: payments-service
-    build_path: ./cmd
-    port: 8009
-    # grpc_port: 9009        # only if it runs a gRPC server
-    type: backend
-    database:
-      name: duynhlab_payments
-      app_user: duynhlab_payments_app
-      migrator_user: duynhlab_payments_migrator
-    dependencies:
-      after: []
-      env_files: []
+Add `payments` to `_SVC_ORDER`, then add its row of keys to the `_SVC`
+associative array (mirror an existing backend such as `auth`):
+
+```bash
+_SVC_ORDER=(auth user product cart order review notification shipping payments frontend)
+
+# …inside the _SVC=( … ) block (one logical row per service):
+  [payments|repo]=duynhlab/payments-service  [payments|src_dir]=payments-service  [payments|binary]=payments-service  [payments|build_path]=./cmd  [payments|port]=8009  [payments|type]=backend  [payments|database.name]=duynhlab_payments  [payments|database.app_user]=duynhlab_payments_app  [payments|database.migrator_user]=duynhlab_payments_migrator
+  # add [payments|grpc_port]=9009 only if it runs a gRPC server
 ```
 
-This alone makes the **dynamic** parts pick the service up (see §4).
+This drives the **build-time** parts (see §4). The runtime CLI and systemd units
+still need the §3 touch points.
 
 ## 3. The hardcoded touch points — checklist
 
-> These are known SSOT gaps (see the automation backlog note in §7). Until they
-> are generated from `services.yaml`, every new service must edit ALL of them.
-> Line numbers are indicative — search for the 8-service list nearby.
+> The §2 registry covers the build scripts; these are the *other* places that
+> independently hardcode the service list. Every new service must edit ALL of
+> them. Line numbers are indicative — search for the 8-service list nearby.
 
 | # | File | Where | What to add |
 |---|---|---|---|
@@ -76,13 +71,15 @@ name:
 grep -rn "notification shipping" scripts/ packages/ | grep -v payments && echo "MISSED A SPOT" || echo OK
 ```
 
-## 4. What you do NOT touch (dynamic — driven by services.yaml)
+## 4. What you do NOT touch (dynamic)
 
+Build scripts read the §2 registry via the `svc_*` accessors:
 `fetch-sources.sh`, `build-local.sh`, `render-systemd.sh` (unit + platform
 target), `stage-all.sh` (staging + composition manifest), `Makefile
-build-local-all`, `duynhctl` (list/health/ports), `password-generator.sh`
-(scans `secret-tpl/*.env.tpl`), `duynhdb` (per-service args),
-`bootstrap.sql`. They all iterate the registry — no edits needed.
+build-local-all`. At runtime, `duynhctl` (list/health/ports) discovers services
+from the installed payload (`/opt/duynhlab/*/` + `PORT` in `<svc>.env`),
+`password-generator.sh` scans `secret-tpl/*.env.tpl`, and `duynhdb` takes a
+per-service arg. None need edits.
 
 ## 5. Build & verify locally
 
@@ -116,7 +113,7 @@ automatically.
 
 ## 7. Automation note
 
-Touch points 1–8 and 10–14 exist because the spec/test/nginx files predate the
-registry. Generating them from `services.yaml` is tracked in the internal
-backlog (`plan-spec.md` B5 render-nginx + B16 render hardcoded lists). If you
-automate one of them, delete its row from §3.
+The §3 touch points exist because the spec/test/nginx files keep their own
+hardcoded service lists, separate from the §2 registry. Generating them from the
+registry is tracked in the internal backlog (`plan-spec.md` B5 render-nginx +
+B16 render hardcoded lists). If you automate one of them, delete its row from §3.

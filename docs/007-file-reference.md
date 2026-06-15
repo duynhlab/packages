@@ -58,6 +58,7 @@ Everything here is replaced wholesale on upgrade — never edit it in place.
 |---|---|---|
 | `lib/init-service.sh` | `%post` scriptlet: creates dirs, drops configs below | payload |
 | `lib/password-generator.sh` | `%post` scriptlet: renders `secret-tpl/` → `/etc/duynhlab/<svc>.env` | payload |
+| `lib/duynhlab-bootstrap` | Helper run by `duynhlab-bootstrap.service`: waits for PostgreSQL, then `duynhdb bootstrap`+`migrate` for every backend (idempotent) | payload |
 | `secret-tpl/<svc>.env.tpl` (×8) | Env templates with `__DB_PASSWORD__` placeholder | payload |
 | `nginx/duynhlab.conf` | Reverse-proxy vhost template (API + frontend) | payload |
 | `nginx/duynhlab-frontend.conf` | Optional standalone frontend vhost (NOT auto-installed) | payload |
@@ -65,18 +66,18 @@ Everything here is replaced wholesale on upgrade — never edit it in place.
 | `postgresql/duynhlab-tuning.conf` | PostgreSQL tuning template | payload |
 | `postgresql/bootstrap.sql` | DB/role bootstrap template, applied by `duynhdb bootstrap` | payload |
 | `logrotate/duynhlab-services`, `logrotate/duynhlab-nginx` | logrotate rule templates | payload |
-| `etc/services.yaml` | Service registry master copy | payload |
 | `etc/env-global.properties` | Global defaults master copy (`DUYNHLAB_VERSION`, `LOG_LEVEL`, `DB_HOST`…) | payload |
+| `etc/bootstrap.env.example` | Commented `SUPERUSER_DSN` example for a remote DB; copy to `/etc/duynhlab/bootstrap.env` | payload |
 | `etc/manifest` | Composition audit: 9 component commits/versions in this build | payload |
 
 ## 4. Config in `/etc/duynhlab` (survives upgrades)
 
 | Path | Owner / mode | Created by | Notes |
 |---|---|---|---|
-| `services.yaml` | `root:root 0644` | init-service | Copy of the registry; read by `duynhctl`/`duynhdb`. Copy-if-missing — your edits stick |
 | `env-global.properties` | `root:root 0644` | init-service | Shared defaults, loaded first by every unit |
 | `<svc>.env` (×8) | `root:duynhlab 0640` | password-generator | Random 32-char `DB_PASSWORD`, `PORT`, `GRPC_PORT`…; `%ghost` — generated once, **never overwritten** |
 | `<svc>.override` | yours | operator | Optional; loaded last, wins. The RPM never creates or touches it |
+| `bootstrap.env` | yours | operator | Optional; only for a REMOTE DB. Sets `SUPERUSER_DSN` for `duynhlab-bootstrap.service`. Same-host DB needs no file (local peer auth) |
 | `secret_version.properties` | `root:duynhlab 0640` | password-generator | `secretVersion=N` — highest completed secret block; lets future releases add new secrets without touching old ones |
 
 How the three env layers combine → [`003-operations.md` §5](003-operations.md#5-configuration).
@@ -99,7 +100,8 @@ drops are best-effort: skipped silently when the target directory is absent.
 | Unit | Purpose |
 |---|---|
 | `duynhlab-platform.target` | Operator entry point — starts/stops all 8 backends |
-| `duynhlab-infra.target` | Ordering against external `nginx`/`postgresql`/`valkey` (does not own them) |
+| `duynhlab-infra.target` | Ordering against external `nginx`/`postgresql`/`valkey` (does not own them); `Requires=` the bootstrap one-shot |
+| `duynhlab-bootstrap.service` | One-shot (`RemainAfterExit`): waits for PostgreSQL, then bootstraps + migrates every backend before they start. Gates `infra.target`; re-runs on upgrade |
 | `duynhlab-<svc>.service` (×8) | One per backend (see table in §2); `PartOf=` the platform target |
 
 ## 7. Runtime state

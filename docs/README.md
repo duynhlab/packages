@@ -17,7 +17,7 @@ the one that matches your task.
 | 003 | [`003-operations.md`](003-operations.md) | Operators (day-2) | `duynhctl` and `duynhdb` reference, bring-up flow, systemd targets, configuration files, upgrade, remove, troubleshooting |
 | 004 | [`004-build.md`](004-build.md) | Contributors / release engineers | Build pipeline, scripts, runner auto-detection, Makefile targets, CI workflows, gh-pages publishing, versioning |
 | 005 | [`005-release.md`](005-release.md) | Release engineers | Runbook: cut a release, same-day hotfix, re-publish a tag, rollback/downgrade, audit composition, troubleshooting per job |
-| 006 | [`006-add-service.md`](006-add-service.md) | Contributors | Onboard a new service: repo prerequisites, `services.yaml` entry, the full hardcoded touch-point checklist, verify, ship |
+| 006 | [`006-add-service.md`](006-add-service.md) | Contributors | Onboard a new service: repo prerequisites, registry entry, the full hardcoded touch-point checklist, verify, ship |
 | 007 | [`007-file-reference.md`](007-file-reference.md) | Anyone (lookup) | Every installed file in one place: binaries, CLI tools, configs, units, runtime state — path, owner/mode, what creates it, what survives upgrades |
 
 ## Conventions used in these docs

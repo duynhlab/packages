@@ -39,9 +39,6 @@ Requires:       coreutils
 Requires:       nginx >= 1.20
 Requires:       postgresql >= 14
 Requires:       valkey >= 7.2
-# mikefarah yq (EPEL ≥4.47 on EL9) — duynhctl parses services.yaml with it.
-# EPEL is already a documented prerequisite (valkey lives there too).
-Requires:       yq >= 4
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/bin/getent
 %{?systemd_requires}
@@ -154,11 +151,21 @@ echo "%{version}-%{release} installed on $(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ) (o
 # 3. systemd_post for every shipped unit.
 %systemd_post duynhlab-platform.target
 %systemd_post duynhlab-infra.target
+%systemd_post duynhlab-bootstrap.service
 for svc in auth user product cart order review notification shipping; do
   if [ -f %{_unitdir}/duynhlab-${svc}.service ]; then
     /usr/bin/systemctl preset duynhlab-${svc}.service >/dev/null 2>&1 || :
   fi
 done
+
+# 3b. On upgrade, re-run the one-time bootstrap so any NEW migrations are applied
+# before the backends are restarted (%postun_with_restart below). Idempotent;
+# the platform was already stopped in %pre. Skipped on first install — bootstrap
+# then runs when the operator starts duynhlab-platform.target (it pulls infra,
+# which Requires duynhlab-bootstrap.service).
+if [ $1 -gt 1 ]; then
+  systemctl restart duynhlab-bootstrap.service >/dev/null 2>&1 || :
+fi
 
 # 4. Reload nginx if it is already running (config dropped by init-service.sh).
 if systemctl is-active --quiet nginx 2>/dev/null; then
@@ -172,21 +179,23 @@ cat <<'EOF'
 ================================================================
   duynhlab installed.
 
-  Next steps (as root), per backend service (auth user product cart
-  order review notification shipping):
+  The database bootstraps itself: duynhlab-bootstrap.service creates every
+  per-service DB + roles and runs migrations automatically, before the
+  backends start.
 
-    # 1. Bootstrap PostgreSQL (one-time, per service):
-    SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \
-      duynhdb bootstrap auth
+  Same-host PostgreSQL — just start the platform (as root):
 
-    # 2. Run migrations (runs the service binary's embedded migrations):
-    duynhdb migrate auth
-
-    # 3. Start platform:
     systemctl enable --now duynhlab-platform.target
 
-    # 4. Verify:
+  Remote/managed PostgreSQL — provide a superuser DSN first:
+
+    echo 'SUPERUSER_DSN=postgresql://postgres:secret@DBHOST:5432/postgres' \
+      > /etc/duynhlab/bootstrap.env      # see /opt/duynhlab/etc/bootstrap.env.example
+    systemctl enable --now duynhlab-platform.target
+
+  Verify:
     duynhctl status
+    duynhdb status auth
     curl http://localhost/health
 ================================================================
 EOF
@@ -204,6 +213,7 @@ if [ $1 -eq 0 ]; then
   done
   %systemd_preun duynhlab-platform.target
   %systemd_preun duynhlab-infra.target
+  %systemd_preun duynhlab-bootstrap.service
 fi
 exit 0
 
@@ -251,6 +261,7 @@ exit 0
 # Systemd units
 %{_unitdir}/duynhlab-infra.target
 %{_unitdir}/duynhlab-platform.target
+%{_unitdir}/duynhlab-bootstrap.service
 %{_unitdir}/duynhlab-auth.service
 %{_unitdir}/duynhlab-user.service
 %{_unitdir}/duynhlab-product.service
@@ -262,7 +273,6 @@ exit 0
 
 # /etc/duynhlab — managed by init-service.sh + password-generator.sh
 %dir %attr(0755, root, %{duynhlab_group}) %{duynhlab_etc}
-%ghost %attr(0644, root, root)            %{duynhlab_etc}/services.yaml
 %ghost %attr(0644, root, root)            %{duynhlab_etc}/env-global.properties
 %ghost %attr(0644, root, root)            %{duynhlab_etc}/secret_version.properties
 %ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/auth.env

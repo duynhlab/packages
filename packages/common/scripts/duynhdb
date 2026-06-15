@@ -14,7 +14,8 @@
 #   DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_SSLMODE
 #   DB_MIGRATOR_USER DB_MIGRATOR_PASSWORD (migrate/status run as the migrator role)
 # Extra env for bootstrap:
-#   SUPERUSER_DSN=postgresql://postgres:secret@host:5432/postgres
+#   SUPERUSER_DSN=postgresql://postgres:secret@host:5432/postgres  (remote DB)
+#   — leave unset for a same-host DB: bootstrap uses local peer auth as `postgres`.
 
 set -euo pipefail
 
@@ -30,7 +31,8 @@ usage() {
 Usage: $PROG <bootstrap|migrate|status> <service>
 
   bootstrap <svc>           Create database, app/migrator users, grant privileges.
-                            Requires SUPERUSER_DSN env var (postgres superuser).
+                            SUPERUSER_DSN for a remote DB; unset = local peer auth
+                            as the postgres OS user (same-host PostgreSQL).
   migrate   <svc>           Apply outstanding migrations via the service binary
                             (\`<binary> migrate\`, as the migrator user).
   status    <svc>           Show installed schema_migrations version vs shipped
@@ -85,9 +87,18 @@ service_binary() {
 case "$CMD" in
   bootstrap)
     require_psql
-    : "${SUPERUSER_DSN:?Set SUPERUSER_DSN=postgresql://postgres:...@host:5432/postgres}"
-    info "Bootstrapping database $DB_NAME on $DB_HOST:$DB_PORT"
-    psql "$SUPERUSER_DSN" -v ON_ERROR_STOP=1 <<SQL
+    # Superuser step: explicit SUPERUSER_DSN (remote/managed DB), or — when unset
+    # — local peer auth as the postgres OS user for a same-host PostgreSQL.
+    if [[ -n "${SUPERUSER_DSN:-}" ]]; then
+      su_psql=(psql "$SUPERUSER_DSN")
+      info "Bootstrapping database $DB_NAME on $DB_HOST:$DB_PORT (SUPERUSER_DSN)"
+    else
+      command -v runuser >/dev/null 2>&1 \
+        || die "SUPERUSER_DSN unset and runuser not found (need it for local peer auth)"
+      su_psql=(runuser -u postgres -- psql)
+      info "Bootstrapping database $DB_NAME via local peer auth (postgres OS user)"
+    fi
+    "${su_psql[@]}" -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$APP_USER') THEN

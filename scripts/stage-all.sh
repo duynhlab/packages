@@ -5,7 +5,7 @@
 #   opt/duynhlab/<svc>/{bin,BINARY_VERSION,SCHEMA_VERSION}
 #   (migrations are embedded in the service binary — no loose SQL is staged; D24)
 #   opt/duynhlab/frontend/dist/...
-#   opt/duynhlab/etc/{services.yaml, env-global.properties}
+#   opt/duynhlab/etc/{env-global.properties, manifest}
 #   opt/duynhlab/{nginx,valkey,postgresql,secret-tpl,logrotate}/...
 #   opt/duynhlab/lib/{init-service.sh, password-generator.sh,
 #                     duynhctl, duynhdb, duynhenv,
@@ -88,12 +88,13 @@ install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhctl"           "$OPT/li
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhdb"      "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhenv"       "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhpass"  "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-bootstrap"       "$OPT/lib/"
 install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhctl.bash-completion" "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/init-service.sh"               "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/password-generator.sh"         "$OPT/lib/"
 log_ok "staged CLI + lib"
-# NOTE: duynhctl's yq comes via `Requires: yq` in the spec (EPEL ships
-# mikefarah yq ≥4.47 on EL9) — nothing to bundle here.
+# NOTE: duynhctl no longer parses a registry file — it discovers services from
+# the filesystem + /etc/duynhlab/<svc>.env, so the RPM needs no yq dependency.
 
 # ── 4. Config templates ───────────────────────────────────────────────────────
 cp -a "$REPO_ROOT/packages/rpm/nginx/."      "$OPT/nginx/"
@@ -103,9 +104,7 @@ cp -a "$REPO_ROOT/packages/rpm/secret-tpl/." "$OPT/secret-tpl/"
 cp -a "$REPO_ROOT/packages/rpm/logrotate/."  "$OPT/logrotate/"
 log_ok "staged config templates"
 
-# ── 5. services.yaml + env-global.properties ──────────────────────────────────
-install -m 0644 "$REPO_ROOT/services.yaml" "$OPT/etc/services.yaml"
-
+# ── 5. env-global.properties ──────────────────────────────────────────────────
 cat > "$OPT/etc/env-global.properties" <<EOF
 # /etc/duynhlab/env-global.properties — system-wide defaults loaded by every
 # duynhlab-*.service unit. Edit on the deployed host; not overwritten on upgrade.
@@ -116,7 +115,17 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_SSLMODE=disable
 EOF
-log_ok "staged etc/services.yaml + env-global.properties"
+
+# bootstrap.env example — only needed for a REMOTE DB. Same-host PostgreSQL uses
+# local peer auth (no file). Operators copy this to /etc/duynhlab/bootstrap.env.
+cat > "$OPT/etc/bootstrap.env.example" <<'EOF'
+# /etc/duynhlab/bootstrap.env — read by duynhlab-bootstrap.service.
+# Only needed when PostgreSQL is on ANOTHER host. For a same-host DB, leave this
+# file absent: bootstrap connects via local peer auth as the postgres OS user.
+#
+# SUPERUSER_DSN=postgresql://postgres:CHANGE_ME@db.example.internal:5432/postgres
+EOF
+log_ok "staged etc/env-global.properties + bootstrap.env.example"
 
 # ── 5b. Composition manifest ──────────────────────────────────────────────────
 # Records exactly which service commits went into this build (audit/rebuild).

@@ -19,7 +19,7 @@ help:
 	@echo ""
 	@echo "  fetch-sources [REF=main]   Clone every service repo into \$$DUYNHLAB_SRC_ROOT"
 	@echo "  build-local SERVICE=<name> Build one service from sibling checkout"
-	@echo "  build-local-all            Build every service in services.yaml"
+	@echo "  build-local-all            Build every service in the registry (scripts/lib/common.sh)"
 	@echo "  render-systemd             Render unit + target files (build/staging/systemd/)"
 	@echo "  stage                      Assemble the Source0 staging tarball"
 	@echo "  build                      Run rpmbuild (host or container) -> dist/"
@@ -43,7 +43,7 @@ build-local:
 	@bash scripts/build-local.sh $(SERVICE) $(VERSION)
 
 build-local-all:
-	@for s in $$(yq '.services[].name' services.yaml); do \
+	@for s in $$(bash -c '. scripts/lib/common.sh && svc_list'); do \
 	  echo "--- build-local $$s ---"; \
 	  bash scripts/build-local.sh $$s || exit 1; \
 	done

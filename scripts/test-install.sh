@@ -38,9 +38,8 @@ log_step "Running install test inside rockylinux:9 ($RUNNER)"
 echo "::group::Repo + dependency setup"
 dnf -y install epel-release >/dev/null
 dnf -y module enable postgresql:16 >/dev/null
-# Valkey lives in EPEL on EL9; nginx in AppStream.
-# Deliberately NO yq here: customer hosts won't have it — duynhctl must
-# work with the copy bundled in the RPM (/opt/duynhlab/lib/yq).
+# Valkey lives in EPEL on EL9; nginx in AppStream. No yq — the RPM no longer
+# needs it (registry is hardcoded; duynhctl discovers services from the filesystem).
 dnf -y install postgresql nginx valkey shadow-utils which file >/dev/null
 echo "::endgroup::"
 
@@ -90,14 +89,16 @@ done
 # duynhlab-db-migrate must NOT exist anymore (D23).
 ! which duynhlab-db-migrate 2>/dev/null || { echo "UNEXPECTED duynhlab-db-migrate present"; exit 1; }
 duynhpass 16 || true
-test -f /etc/duynhlab/services.yaml || { echo "services.yaml not dropped"; exit 1; }
 echo "::endgroup::"
 
-echo "::group::duynhctl works out-of-box (yq pulled as RPM dependency)"
-# We never install yq by hand in this test — `Requires: yq` must have made dnf
-# pull it (mikefarah yq from EPEL). This reproduces a clean customer host.
-command -v yq >/dev/null 2>&1 || { echo "MISSING yq — Requires: yq not resolved"; exit 1; }
-yq --version | grep -q mikefarah || { echo "WRONG yq (expected mikefarah): $(yq --version)"; exit 1; }
+echo "::group::duynhctl works out-of-box (no yq, no services.yaml)"
+# The service registry is hardcoded at build time and duynhctl discovers services
+# from the filesystem, so a clean customer host needs neither yq nor a registry
+# file. Assert both are absent, then exercise the registry-free CLI.
+if rpm -qR duynhlab | grep -iqE '(^|[[:space:]])yq'; then
+  echo "UNEXPECTED yq in RPM Requires"; exit 1
+fi
+test ! -e /etc/duynhlab/services.yaml || { echo "UNEXPECTED services.yaml present"; exit 1; }
 duynhctl list
 duynhctl ports
 echo "::endgroup::"

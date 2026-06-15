@@ -1,7 +1,0 @@
-#!/bin/sh
-# preremove — stop and disable the service on package removal.
-set -e
-if [ "$1" = "0" ] || [ "$1" = "remove" ]; then
-  systemctl --no-reload disable --now "duynhlab-__SERVICE_NAME__.service" >/dev/null 2>&1 || :
-fi
-exit 0
