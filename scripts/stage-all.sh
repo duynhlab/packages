@@ -88,6 +88,7 @@ install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhctl"           "$OPT/li
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhdb"      "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhenv"       "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhpass"  "$OPT/lib/"
+install -m 0755 "$REPO_ROOT/packages/common/scripts/duynhlab-bootstrap"       "$OPT/lib/"
 install -m 0644 "$REPO_ROOT/packages/common/scripts/duynhctl.bash-completion" "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/init-service.sh"               "$OPT/lib/"
 install -m 0755 "$REPO_ROOT/packages/rpm/lib/password-generator.sh"         "$OPT/lib/"
@@ -114,7 +115,17 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_SSLMODE=disable
 EOF
-log_ok "staged etc/env-global.properties"
+
+# bootstrap.env example — only needed for a REMOTE DB. Same-host PostgreSQL uses
+# local peer auth (no file). Operators copy this to /etc/duynhlab/bootstrap.env.
+cat > "$OPT/etc/bootstrap.env.example" <<'EOF'
+# /etc/duynhlab/bootstrap.env — read by duynhlab-bootstrap.service.
+# Only needed when PostgreSQL is on ANOTHER host. For a same-host DB, leave this
+# file absent: bootstrap connects via local peer auth as the postgres OS user.
+#
+# SUPERUSER_DSN=postgresql://postgres:CHANGE_ME@db.example.internal:5432/postgres
+EOF
+log_ok "staged etc/env-global.properties + bootstrap.env.example"
 
 # ── 5b. Composition manifest ──────────────────────────────────────────────────
 # Records exactly which service commits went into this build (audit/rebuild).

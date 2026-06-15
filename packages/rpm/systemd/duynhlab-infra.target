@@ -5,10 +5,15 @@ Documentation=https://duynhlab.github.io/packages
 # once nginx/postgresql/valkey have finished starting, so duynhlab backends
 # (which order After=duynhlab-infra.target) never race ahead of the database.
 After=network-online.target nginx.service postgresql.service valkey.service
+After=duynhlab-bootstrap.service
 Wants=network-online.target
 Wants=nginx.service
 Wants=postgresql.service
 Wants=valkey.service
+# DB bootstrap + migrate must finish before backends start. Requires= so a failed
+# bootstrap blocks the platform rather than letting services crash-loop against an
+# unmigrated database.
+Requires=duynhlab-bootstrap.service
 
 [Install]
 WantedBy=multi-user.target

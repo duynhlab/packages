@@ -45,8 +45,10 @@ WANTS_LINES="$WANTS" envsubst '$WANTS_LINES' \
   < "$TARGET_TPL" > "$OUT_DIR/duynhlab-platform.target"
 log_ok "rendered duynhlab-platform.target ($(grep -c '^Wants=duynhlab-' "$OUT_DIR/duynhlab-platform.target") services)"
 
-# ── Copy static duynhlab-infra.target ─────────────────────────────────────────
+# ── Copy static units (infra target + one-time bootstrap) ─────────────────────
 install -m 0644 "$TPL_DIR/duynhlab-infra.target" "$OUT_DIR/duynhlab-infra.target"
 log_ok "copied duynhlab-infra.target"
+install -m 0644 "$TPL_DIR/duynhlab-bootstrap.service" "$OUT_DIR/duynhlab-bootstrap.service"
+log_ok "copied duynhlab-bootstrap.service"
 
 log_info "Output: ${OUT_DIR#$REPO_ROOT/}"

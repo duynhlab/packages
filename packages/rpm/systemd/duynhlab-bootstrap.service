@@ -1,0 +1,24 @@
+[Unit]
+Description=duynhlab one-time DB bootstrap + migrate (all backends)
+Documentation=https://duynhlab.github.io/packages
+# Run after PostgreSQL is up; gate the infra target on us so backends (which are
+# ordered After=duynhlab-infra.target) never start before their schema exists.
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+Before=duynhlab-infra.target
+ConditionPathExists=/opt/duynhlab/lib/duynhlab-bootstrap
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Generous: the helper waits for PostgreSQL to accept connections, then runs the
+# idempotent bootstrap+migrate for every backend.
+TimeoutStartSec=3600
+# Optional: SUPERUSER_DSN for a remote DB. Empty/absent = local peer auth as the
+# postgres OS user (same-host PostgreSQL).
+EnvironmentFile=-/etc/duynhlab/bootstrap.env
+ExecStart=/opt/duynhlab/lib/duynhlab-bootstrap
+
+[Install]
+WantedBy=duynhlab-infra.target

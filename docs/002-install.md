@@ -82,31 +82,31 @@ The post-install scriptlet:
 - registers per-service systemd units and the `duynhlab-platform.target`
 - **does not** enable or start anything — that is your job
 
-## 3. Bootstrap the database (one-time)
+## 3. Database bootstrap (automatic)
 
-`duynhdb` is **per-service**: each invocation takes a single service
-name (`bootstrap <svc>` / `migrate <svc>`). It creates one database + two roles
-(`app`, `migrator`) for that service and stores the generated app-role password
-in `/etc/duynhlab/<svc>.env`.
+Bootstrap is **automatic** — there are no manual `duynhdb` loops. The one-shot
+unit `duynhlab-bootstrap.service` runs before the backends (it gates
+`duynhlab-infra.target`): it waits for PostgreSQL, then for every backend creates
+the database + `app`/`migrator` roles and applies the embedded migrations. It is
+idempotent and re-runs on upgrade so new migrations land before the new binaries.
 
-Provide a PostgreSQL superuser DSN via `SUPERUSER_DSN` and loop over the
-backend services:
+- **Same-host PostgreSQL** — nothing to configure. Bootstrap connects via local
+  peer auth as the `postgres` OS user.
+- **Remote / managed PostgreSQL** — provide a superuser DSN once:
 
-```bash
-export SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres"
+  ```bash
+  sudo cp /opt/duynhlab/etc/bootstrap.env.example /etc/duynhlab/bootstrap.env
+  sudo chmod 0640 /etc/duynhlab/bootstrap.env
+  sudoedit /etc/duynhlab/bootstrap.env     # set SUPERUSER_DSN=postgresql://postgres:…@DBHOST:5432/postgres
+  ```
 
-for svc in auth user product cart order review notification shipping; do
-  sudo -E duynhdb bootstrap "$svc"
-done
-
-for svc in auth user product cart order review notification shipping; do
-  sudo duynhdb migrate "$svc"
-done
-```
-
-(`migrate` uses the migrator role and does not need `SUPERUSER_DSN`.)
+You can still bootstrap/migrate a single service by hand if needed:
+`SUPERUSER_DSN=… sudo -E duynhdb bootstrap <svc> && sudo duynhdb migrate <svc>`.
 
 ## 4. Start the platform
+
+Starting the platform pulls `duynhlab-infra.target`, which runs the bootstrap
+one-shot first, then the backends:
 
 ```bash
 sudo systemctl enable --now duynhlab-platform.target
@@ -117,7 +117,9 @@ Verify:
 ```bash
 duynhctl status            # per-service status table
 duynhctl ports             # listening port mapping
+duynhdb status auth        # installed vs shipped schema version
 curl -fsS http://localhost/health
+journalctl -u duynhlab-bootstrap.service --no-pager   # bootstrap + migrate log
 journalctl -u 'duynhlab-*' -e --no-pager
 ```
 
