@@ -1,11 +1,15 @@
 [Unit]
 Description=duynhlab one-time DB bootstrap + migrate (all backends)
 Documentation=https://duynhlab.github.io/packages
-# Run after PostgreSQL is up; gate the infra target on us so backends (which are
-# ordered After=duynhlab-infra.target) never start before their schema exists.
+# Gate the infra target on us so backends (ordered After=duynhlab-infra.target)
+# never start before their schema exists.
+#
+# PostgreSQL is a SOFT dep (Wants/After): a same-host postgresql.service is pulled
+# and ordered before us, but a remote/managed/containerized DB has no local unit —
+# a hard Requires= would then fail the job with 'dependency' and the one-shot
+# would never run. The helper waits for the DB itself (pg_isready) regardless.
 After=network-online.target postgresql.service
-Wants=network-online.target
-Requires=postgresql.service
+Wants=network-online.target postgresql.service
 Before=duynhlab-infra.target
 ConditionPathExists=/opt/duynhlab/lib/duynhlab-bootstrap
 
