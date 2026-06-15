@@ -43,8 +43,11 @@ list_services() {
   done
 }
 svc_port() {
+  # Returns 0 even when the env file is absent (e.g. frontend) — an empty port is
+  # not an error. A bare `[[ -f ]] && …` would return 1 and abort callers' `set -e`.
   local f="$ETC_BASE/$1.env"
-  [[ -f "$f" ]] && sed -n 's/^PORT=//p' "$f" | head -1
+  [[ -f "$f" ]] || return 0
+  sed -n 's/^PORT=//p' "$f" | head -1
 }
 svc_type() { [[ "$1" == "frontend" ]] && echo static || echo backend; }
 
