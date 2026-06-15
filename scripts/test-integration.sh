@@ -8,9 +8,12 @@
 # In the app container we:
 #   1. install epel + nginx + valkey + postgresql client
 #   2. dnf localinstall the mega-RPM
-#   3. duynhdb <svc> bootstrap   (loop services with DB)
-#   4. duynhdb <svc> migrate
-#   5. systemctl start duynhlab-platform.target
+#   3. write /etc/duynhlab/bootstrap.env (SUPERUSER_DSN → sidecar) — NO manual
+#      bootstrap; assert no duynhlab_* DBs exist yet
+#   4. systemctl enable --now duynhlab-platform.target — this runs the
+#      duynhlab-bootstrap.service one-shot, which creates every DB + role and
+#      migrates, THEN the backends start
+#   5. assert duynhlab-bootstrap.service succeeded and created the schemas
 #   6. curl localhost:<port>/health for every backend
 #   7. duynhctl status / logs sanity
 #   8. shutdown
@@ -155,22 +158,54 @@ DB_SSLMODE=disable
 EOF
 '
 
-# ── 5. Bootstrap + migrate every backend DB ───────────────────────────────────
-log_step "bootstrap + migrate per-service databases"
-for svc in "${BACKENDS[@]}"; do
-  exec_app "
-    set -e
-    SUPERUSER_DSN='postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/postgres?sslmode=disable' \
-      duynhdb bootstrap $svc
-    duynhdb migrate $svc
-    duynhdb status   $svc
-  "
-done
-log_ok "DB bootstrap + migrate OK"
+# ── 5. Configure auto-bootstrap, then PROVE it does the work ──────────────────
+# The DB is a sidecar — reachable on localhost TCP but NOT via a local unix
+# socket, so the one-shot needs an explicit superuser DSN (the remote-DB path)
+# rather than local peer auth. Drop it into bootstrap.env and do NOT bootstrap by
+# hand: duynhlab-bootstrap.service must create + migrate everything itself.
+log_step "configure /etc/duynhlab/bootstrap.env (remote-DB path)"
+exec_app "
+  set -e
+  umask 077
+  printf 'SUPERUSER_DSN=postgresql://postgres:%s@127.0.0.1:5432/postgres?sslmode=disable\n' \
+    '${POSTGRES_PASSWORD}' > /etc/duynhlab/bootstrap.env
+  chmod 0640 /etc/duynhlab/bootstrap.env
+"
 
-# ── 6. Start platform target + assert health ─────────────────────────────────
-log_step "systemctl enable --now duynhlab-platform.target"
-exec_app 'systemctl daemon-reload && systemctl enable --now duynhlab-platform.target'
+# Baseline: no service databases exist yet, so a later success is attributable to
+# the one-shot, not to anything we ran by hand.
+log_step "assert no duynhlab_* databases exist yet"
+exec_app "
+  PGPASSWORD='${POSTGRES_PASSWORD}' psql -h 127.0.0.1 -U postgres -tAc \
+    \"SELECT count(*) FROM pg_database WHERE datname LIKE 'duynhlab%'\" \
+    | grep -qx 0
+" || die "expected zero duynhlab_* databases before bootstrap"
+
+# ── 6. Start the platform — the one-shot bootstrap runs first ─────────────────
+log_step "systemctl enable --now duynhlab-platform.target (triggers duynhlab-bootstrap.service)"
+if ! exec_app 'systemctl daemon-reload && systemctl enable --now duynhlab-platform.target'; then
+  exec_app 'systemctl --no-pager status duynhlab-bootstrap.service || :
+            journalctl -u duynhlab-bootstrap.service --no-pager -n 100 || :' >&2 || :
+  die "platform target failed to start (bootstrap one-shot?)"
+fi
+
+# Assert the one-shot actually ran to success (oneshot + RemainAfterExit → active).
+log_step "assert duynhlab-bootstrap.service succeeded"
+bstate=$(exec_app 'systemctl is-active duynhlab-bootstrap.service' || true)
+bresult=$(exec_app 'systemctl show -p Result --value duynhlab-bootstrap.service' || true)
+if [[ "$bstate" != "active" || "$bresult" != "success" ]]; then
+  exec_app 'journalctl -u duynhlab-bootstrap.service --no-pager -n 120' >&2 || :
+  die "duynhlab-bootstrap.service did not succeed (is-active=$bstate result=$bresult)"
+fi
+log_ok "duynhlab-bootstrap.service: active / $bresult"
+
+# And that the one-shot (not us) created the DBs + applied migrations.
+log_step "assert per-service schemas were created by the one-shot"
+for svc in "${BACKENDS[@]}"; do
+  exec_app "duynhdb status $svc" >/dev/null 2>&1 \
+    || { exec_app "duynhdb status $svc" >&2 || :; die "duynhdb status failed for $svc (DB/migrations missing)"; }
+done
+log_ok "all per-service schemas present"
 
 log_info "wait 5s for services to settle"
 sleep 5
