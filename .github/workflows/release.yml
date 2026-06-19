@@ -43,7 +43,7 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
       - name: Checkout (full history for ancestry check)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -114,13 +114,13 @@ jobs:
       CREATEREPO_RUNNER: docker
     steps:
       - name: Checkout packages repo at tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.guard.outputs.tag }}
           path: packages
 
       - name: Checkout gh-pages
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: gh-pages
