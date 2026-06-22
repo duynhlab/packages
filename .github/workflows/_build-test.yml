@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout packages repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: packages
           ref: ${{ inputs.checkout-ref }}
@@ -135,7 +135,7 @@ jobs:
 
     steps:
       - name: Checkout packages repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: packages
           ref: ${{ inputs.checkout-ref }}
