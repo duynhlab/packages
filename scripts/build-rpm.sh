@@ -24,18 +24,7 @@ TOP="$BUILD_DIR/rpmbuild"
 [[ -f "$SPEC" ]] || die "Missing $SPEC"
 [[ -f "$SRC"  ]] || die "Missing $SRC — run scripts/stage-all.sh first"
 
-# Auto-pick runner
-if [[ -z "${BUILD_RUNNER:-}" ]]; then
-  if command -v rpmbuild >/dev/null 2>&1; then
-    BUILD_RUNNER=host
-  elif command -v podman >/dev/null 2>&1; then
-    BUILD_RUNNER=podman
-  elif command -v docker >/dev/null 2>&1; then
-    BUILD_RUNNER=docker
-  else
-    die "No rpmbuild on host and no container runtime available"
-  fi
-fi
+BUILD_RUNNER="$(pick_runner rpmbuild "${BUILD_RUNNER:-}")"
 
 log_info "VERSION=$VERSION  RUNNER=$BUILD_RUNNER"
 mkdir -p "$TOP"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} "$DIST_DIR"
