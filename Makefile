@@ -1,6 +1,6 @@
-# duynhlab/packages — RPM SPEC mega-package builder
+# duynhlab/packages — mega-RPM builder
 #
-# Option A: single monorepo SPEC at packages/rpm/duynhlab.spec produces ONE RPM
+# A single SPEC at packages/rpm/duynhlab.spec produces ONE RPM
 # (duynhlab-<VERSION>-1.el9.x86_64.rpm) containing all 8 backends + frontend
 # + CLI tools + nginx/valkey/postgresql config templates.
 
