@@ -23,7 +23,7 @@ Summary:        duynhlab e-commerce platform (mega-RPM)
 License:        Proprietary
 URL:            https://duynhlab.github.io/packages
 Vendor:         duynhlab
-Packager:       duynhlab ops <ops@duynhlab.io>
+Packager:       duynhlab ops <ops@duynh.me>
 
 Source0:        duynhlab-%{version}-staging.tar.gz
 
@@ -285,6 +285,6 @@ exit 0
 %ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/shipping.env
 
 %changelog
-* Sun May 24 2026 duynhlab ops <ops@duynhlab.io> - 2026.05.20-1
+* Sun May 24 2026 duynhlab ops <ops@duynh.me> - 2026.05.20-1
 - Initial mega-RPM release (Option A monorepo SPEC).
 - 8 backend services + frontend + common CLI in a single package.
