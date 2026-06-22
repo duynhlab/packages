@@ -31,7 +31,4 @@ jobs:
     uses: ./.github/workflows/_build-test.yml
     with:
       artifact-name: duynhlab-rpms
-      # PRs keep the fast path (file-level install test only); main pushes and
-      # manual dispatches also get the full systemd + Postgres integration test.
-      run-integration: ${{ github.event_name != 'pull_request' }}
       services-ref: ${{ github.event.inputs.ref || 'main' }}
