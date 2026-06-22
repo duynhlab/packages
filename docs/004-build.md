@@ -139,7 +139,7 @@ flowchart LR
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
 | **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact (CI-only, 14d). |
-| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
+| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → force-push the orphan `gh-pages` branch, which GitHub Pages serves directly (source = *Deploy from a branch: gh-pages*; no `deploy-pages` job). Published RPM == tested RPM (same artifact, same run). |
 
 **Cutting a release:**
 
@@ -181,11 +181,12 @@ Because gh-pages is now KB-sized, it is force-pushed as a **single-commit orphan
 branch** each run — no large-file pushes, no history bloat. Release history (and
 rollback) is preserved on the Releases page itself, keyed by the `v<VER>` tag.
 
-`actions/deploy-pages` then publishes the gh-pages tree (it replaces the whole
-site each deploy, which is fine because the metadata is fully regenerated every
-run). Local `make publish-repo` runs without `RELEASE_BASE_URL`, falling back to
-the self-contained model (RPMs copied into the tree) so the repo is servable
-from `python3 -m http.server`.
+GitHub Pages serves that branch directly (**source = Deploy from a branch:
+`gh-pages`**), so the force-push *is* the deploy — there is no `actions/deploy-pages`
+job and no `github-pages` environment (hence no deployment branch/tag policy to
+trip over). Local `make publish-repo` runs without `RPM_TREE`/`RELEASE_BASE_URL`,
+falling back to the self-contained model (RPMs copied into the tree) so the repo
+is servable from `python3 -m http.server`.
 
 ## 6. Versioning
 

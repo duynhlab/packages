@@ -12,9 +12,11 @@ merge to main ──► build-rpms (validate only — never publishes)
 make release  ──► annotated tag vYYYY.MM.DD[.N]
                       │ push
                       ▼
-              release.yml:  guard ─► build-test (VERSION = tag) ─► publish ─► deploy
+              release.yml:  guard ─► build-test (VERSION = tag) ─► publish
                                      └ the RPM that passes the tests is the
                                        byte-identical RPM that gets published
+                                       (publish force-pushes gh-pages, which
+                                        Pages serves directly — no deploy job)
 ```
 
 Key invariants:
