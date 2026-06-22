@@ -102,8 +102,6 @@ jobs:
     needs: [guard, build-test]
     permissions:
       contents: write
-      pages: write
-      id-token: write
     env:
       TAG: ${{ needs.guard.outputs.tag }}
       VERSION: ${{ needs.guard.outputs.version }}
@@ -225,15 +223,9 @@ jobs:
           git commit -m "publish ${TAG}: $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
           git branch -M publish gh-pages
           git push -f origin gh-pages
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: gh-pages
-          include-hidden-files: true
+          # GitHub Pages source is set to "Deploy from a branch: gh-pages" —
+          # this push IS the deploy (no actions/deploy-pages job, no
+          # github-pages environment, so no tag deployment-policy gate).
 
       - name: Print final URLs
         run: |
@@ -241,20 +233,3 @@ jobs:
           echo "Repo:       $BASE_URL"
           echo ".repo file: $BASE_URL/duynhlab.repo"
           echo "Metadata:   $BASE_URL/rpm/el9/x86_64/repodata/"
-
-  deploy:
-    name: Deploy gh-pages tree to GitHub Pages
-    needs: publish
-    runs-on: ubuntu-latest
-    # Top-level permissions are contents:read — deploy-pages needs its own
-    # elevation (OIDC token), it does NOT inherit from the publish job.
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
