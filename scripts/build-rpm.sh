@@ -81,10 +81,12 @@ case "$BUILD_RUNNER" in
 esac
 
 # ── Collect output ────────────────────────────────────────────────────────────
+# Scope to the version just built: rpmbuild never cleans RPMS/ SRPMS/, so an
+# unscoped glob would also copy stale RPMs from earlier builds into dist/.
 shopt -s nullglob
-rpms=( "$TOP/RPMS/x86_64/"*.rpm )
-srpms=( "$TOP/SRPMS/"*.src.rpm )
-[[ ${#rpms[@]} -gt 0 ]] || die "rpmbuild produced no x86_64 RPMs"
+rpms=( "$TOP/RPMS/x86_64/duynhlab-${VERSION}-"*.rpm )
+srpms=( "$TOP/SRPMS/duynhlab-${VERSION}-"*.src.rpm )
+[[ ${#rpms[@]} -gt 0 ]] || die "rpmbuild produced no x86_64 RPM for $VERSION"
 
 for r in "${rpms[@]}" "${srpms[@]}"; do
   cp -f "$r" "$DIST_DIR/"

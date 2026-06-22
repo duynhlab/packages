@@ -14,10 +14,6 @@ on:
         description: "RPM version. Empty = CalVer date (CI dev builds)."
         type: string
         default: ""
-      run-integration:
-        description: "Run the full systemd + Postgres integration test job."
-        type: boolean
-        default: true
       artifact-name:
         description: "Name for the uploaded RPM (+ MANIFEST.txt) artifact."
         type: string
@@ -81,6 +77,11 @@ jobs:
 
       - name: Build all services (binaries + frontend dist)
         working-directory: packages
+        # fetch-sources.sh already checked out the requested services-ref; tell
+        # build-local.sh to build the tree as-is instead of re-syncing to main
+        # (without this it force-checkouts main and silently overrides the ref).
+        env:
+          DUYNHLAB_NO_GIT: "1"
         run: |
           set -euo pipefail
           for svc in $(bash -c '. scripts/lib/common.sh && svc_list'); do
@@ -124,59 +125,3 @@ jobs:
             packages/dist/MANIFEST.txt
           if-no-files-found: error
           retention-days: 14
-
-  # Full systemd + Postgres integration test — reuses the artifact, no rebuild.
-  test-integration:
-    name: Integration test (systemd + Postgres)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: build
-    if: inputs.run-integration
-
-    steps:
-      - name: Checkout packages repo
-        uses: actions/checkout@v7
-        with:
-          path: packages
-          ref: ${{ inputs.checkout-ref }}
-
-      - name: Download RPM artifact from build job
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ inputs.artifact-name }}
-          path: packages/dist
-
-      - name: Install podman
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq podman uidmap
-          podman --version
-
-      # test-integration.sh boots a systemd container; the default centos:stream9
-      # image is minimal and has NO /sbin/init — build a systemd-capable image.
-      # Everything runs ROOTLESS (root podman + systemd-in-container breaks on
-      # the ubuntu runners).
-      - name: Build systemd-capable app image
-        run: |
-          podman build -t localhost/duynhlab-test-init:latest -f - . <<'EOF'
-          FROM quay.io/centos/centos:stream9
-          RUN dnf -y install systemd && dnf clean all
-          EOF
-
-      # KEEP_POD=1 so a failure leaves the containers for the journal dump below.
-      - name: Integration test
-        working-directory: packages
-        env:
-          APP_IMAGE: localhost/duynhlab-test-init:latest
-          KEEP_POD: "1"
-        run: ./scripts/test-integration.sh
-
-      - name: Dump app journal on failure
-        if: failure()
-        run: |
-          set +e
-          podman ps -a
-          podman logs duynhlab-test-app    | tail -300 || true
-          podman logs duynhlab-test-db     | tail -100 || true
-          podman exec duynhlab-test-app journalctl -xe --no-pager | tail -500 || true

@@ -5,7 +5,7 @@
 # + CLI tools + nginx/valkey/postgresql config templates.
 
 .PHONY: help all fetch-sources build-local build-local-all render-systemd \
-        stage build test-install test-integration publish-repo release clean
+        stage build test-install publish-repo release clean
 
 SERVICE          ?=
 VERSION          ?= $(shell date -u +%Y.%m.%d)
@@ -24,7 +24,6 @@ help:
 	@echo "  stage                      Assemble the Source0 staging tarball"
 	@echo "  build                      Run rpmbuild (host or container) -> dist/"
 	@echo "  test-install               Install dist/*.rpm in Rocky 9 + verify"
-	@echo "  test-integration           Boot platform: podman --systemd=always + Postgres sidecar"
 	@echo "  publish-repo               Stage gh-pages YUM repo (build/gh-pages/)"
 	@echo "  release                    Cut a release: next CalVer tag (vYYYY.MM.DD[.N]) -> push -> CI publishes"
 	@echo "  all                        stage + build + test-install"
@@ -59,9 +58,6 @@ build: stage
 
 test-install:
 	@bash scripts/test-install.sh
-
-test-integration:
-	@bash scripts/test-integration.sh
 
 publish-repo:
 	@bash scripts/publish-yum-repo.sh

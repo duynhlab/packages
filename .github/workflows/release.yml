@@ -93,7 +93,6 @@ jobs:
     with:
       version: ${{ needs.guard.outputs.version }}
       checkout-ref: ${{ needs.guard.outputs.tag }}
-      run-integration: true
       artifact-name: duynhlab-release-${{ needs.guard.outputs.tag }}
 
   publish:

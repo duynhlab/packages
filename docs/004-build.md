@@ -23,7 +23,7 @@ flowchart TD
   SRC0 --> BR[build-rpm.sh]
   SPEC[packages/rpm/duynhlab.spec] --> BR
   BR -->|rpmbuild| RPM[dist/duynhlab-VER-1.el9.x86_64.rpm]
-  RPM --> SM[test-install.sh / test-integration.sh]
+  RPM --> SM[test-install.sh]
   RPM --> PUB[publish-yum-repo.sh]
   PUB -->|createrepo_c| GH[gh-pages YUM repo]
 ```
@@ -61,7 +61,6 @@ All scripts live in [`scripts/`](../scripts) and source
 > Keep SRPMs only if you ever distribute via Fedora/EPEL or must ship source for
 > compliance — neither applies here.
 | `test-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
-| `test-integration.sh` | `dist/*.rpm` | — | Full systemd boot + health check (podman + Postgres) |
 
 ### Runner auto-detection
 
@@ -88,7 +87,6 @@ make render-systemd           # render units only
 make stage                    # build Source0 staging tarball
 make build                    # stage + rpmbuild -> dist/
 make test-install             # file-level install check
-make test-integration         # full systemd boot + health (podman + Postgres)
 make publish-repo             # stage gh-pages YUM tree
 make release                  # cut a release: next CalVer tag -> push -> release.yml
 make all                      # stage + build + test-install
@@ -119,10 +117,7 @@ ls -lh dist/                 # duynhlab-2026.06.01-1.el9.x86_64.rpm
 # 3. verify it installs cleanly
 make test-install
 
-# 4. (optional) full boot test with a real Postgres + systemd
-make test-integration        # needs podman with cgroup v2
-
-# 5. (optional) stage a local YUM mirror
+# 4. (optional) stage a local YUM mirror
 REPO_OUT=/tmp/duynhlab-repo BASE_URL=http://localhost:8080 \
   ./scripts/publish-yum-repo.sh
 python3 -m http.server -d /tmp/duynhlab-repo 8080
@@ -132,8 +127,7 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 
 ```mermaid
 flowchart LR
-  PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build]
-  B -->|artifact, main only| S[build-rpms: test-integration]
+  PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build<br/>build + install-test]
   TAG[push tag vYYYY.MM.DD<br/>via make release] --> G[release: guard]
   G --> BT[release: build-test<br/>VERSION = tag]
   BT -->|same artifact| PUB[release: publish]
@@ -144,8 +138,8 @@ flowchart LR
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact (CI-only, 14d). Job `test-integration` (main + manual, `needs: build`): full systemd + Postgres integration test on the artifact. |
-| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install + test-integration on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact (CI-only, 14d). |
+| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
 
 **Cutting a release:**
 

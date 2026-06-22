@@ -16,8 +16,7 @@ Guide for AI agents and contributors working on `duynhlab/packages`.
 - **Branching:** never commit on `main`; branch first (`feat/…`, `fix/…`, `docs/…`) and open a PR.
 - **Pre-PR checks:**
   - `bash -n` every script you touched (and `shellcheck` if installed).
-  - `make build` must produce a clean RPM; run `make test-install` (and `make test-integration` when changing
-    runtime/migration/systemd behavior).
+  - `make build` must produce a clean RPM; run `make test-install` to verify the installed layout.
   - Keep changes surgical — every changed line should trace to the task (see `CLAUDE.md`).
 - **Scope:** service *code* lives in the `duynhlab/<svc>-service` repos, not here. This repo only
   repackages built artifacts.
@@ -60,7 +59,7 @@ scripts/                       Build / render / ops scripts
 ├── stage-all.sh               Assemble FHS payload → Source0 staging tarball
 ├── build-rpm.sh               rpmbuild packages/rpm/duynhlab.spec → dist/*.rpm (host/podman/docker)
 ├── publish-yum-repo.sh        createrepo_c → gh-pages YUM metadata
-└── test-install.sh / test-integration.sh   install / integration tests
+└── test-install.sh           file-level install check (Rocky 9 container)
 packages/
 ├── common/scripts/            duynhctl, duynhdb, duynhenv, duynhpass
 └── rpm/
@@ -118,14 +117,13 @@ make render-systemd             # render units only
 make stage                      # assemble Source0 staging tarball
 make build                      # stage + rpmbuild -> dist/
 make test-install               # file-level install check (Rocky 9 container)
-make test-integration           # full systemd boot + health (podman + Postgres sidecar)
 make publish-repo               # stage gh-pages YUM tree
 make release                    # cut a release: next CalVer tag -> push -> release.yml publishes
 make clean                      # rm build/ dist/
 ```
 
 Env knobs: `VERSION` (CalVer default), `DUYNHLAB_SRC_ROOT` (default `..`),
-`BUILD_RUNNER` (`host|podman|docker`), `APP_IMAGE` (test-integration systemd image).
+`BUILD_RUNNER` (`host|podman|docker`).
 Lint = `bash -n` on every script (+ `shellcheck` when available). No Go toolchain build here — binaries
 come pre-built from the service repos.
 
@@ -162,19 +160,8 @@ come pre-built from the service repos.
 ## Testing
 
 - **`test-install.sh`** — installs the RPM in a `rockylinux:9` container, asserts the FHS layout and
-  that **no `migrations/` dir** and **no `duynhlab-db-migrate`** are shipped.
-- **`test-integration.sh`** — podman pod with a Postgres 16 sidecar + a systemd app container; installs the
-  RPM, runs `bootstrap`+`migrate`+`status` per backend, `enable --now duynhlab-platform.target`, then
-  `curl /health` for each service. Uses `ENV=production`.
-  - **`APP_IMAGE` must contain `/sbin/init`.** The default `centos:stream9` is minimal (no systemd) —
-    build one first:
-    ```
-    podman build -t localhost/duynhlab-test-init - <<'D'
-    FROM quay.io/centos/centos:stream9
-    RUN dnf -y install systemd && dnf clean all
-    D
-    APP_IMAGE=localhost/duynhlab-test-init make test-integration
-    ```
+  that **no `migrations/` dir** and **no `duynhlab-db-migrate`** are shipped. This is the only
+  automated test (run in CI and via `make test-install`).
 
 ## Gotchas and non-obvious rules
 

@@ -62,8 +62,12 @@ declare -A _SVC_AFTER=(
 )
 
 # build.env for static services (KEY=VALUE lines) — baked into the SPA at build time.
+# VITE_API_BASE_URL is intentionally EMPTY: on the RPM the SPA and the APIs share
+# one origin behind local nginx (the gateway role), so the SPA calls relative
+# /{service}/v1/... paths — no Kong, no cross-origin. (Empty is honored by the
+# frontend's getApiBaseUrl via `??`; cloud builds leave it unset for the gateway.)
 declare -A _SVC_BUILDENV=(
-  [frontend]=$'VITE_API_BASE_URL=https://gateway.duynh.me\nVITE_USE_MOCK=false'
+  [frontend]=$'VITE_API_BASE_URL=\nVITE_USE_MOCK=false'
 )
 
 # svc_list — print every service name on its own line (registry order).
