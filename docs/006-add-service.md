@@ -21,8 +21,7 @@ conventions or the pipeline can't build/run it:
   DB_NAME DB_USER DB_PASSWORD DB_SSLMODE`, plus `PORT` (and `GRPC_PORT` if it
   serves gRPC). Defaults of 8080/9090 in code are fine — the RPM overrides
   them per service.
-- **`GET /health`** returning 200 on the HTTP port — `duynhctl health` and
-  the integration test poll it.
+- **`GET /health`** returning 200 on the HTTP port — `duynhctl health` polls it.
 - Logs to stdout/stderr (journald captures them).
 
 ## 2. The registry step — `scripts/lib/common.sh`
@@ -58,11 +57,8 @@ still need the §3 touch points.
 | 7 | `packages/rpm/duynhlab.spec` | `%files` ghost env list (~262) | `%ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/payments.env` |
 | 8 | `packages/rpm/lib/init-service.sh` | `BACKENDS` array (~19) | `payments` |
 | 9 | `packages/rpm/secret-tpl/payments.env.tpl` | **new file** | copy `auth.env.tpl`, set `SERVICE_NAME`/`PORT=8009`/(`GRPC_PORT`)/`DB_NAME=duynhlab_payments`/`DB_USER=duynhlab_payments_app`/migrator names; keep `__DB_PASSWORD__` placeholders |
-| 10 | `scripts/test-integration.sh` | `BACKENDS` array (~50) | `payments` |
-| 11 | `scripts/test-integration.sh` | `PORTS` map (~51) | `[payments]=8009` |
-| 12 | `scripts/test-integration.sh` | pod port-publish loop (~78) | `8009` |
-| 13 | `scripts/test-install.sh` | binary-check loop (~62), `expected_services` (~107), env-file loop (~122), log-dir loop (~148) | `payments` in all four |
-| 14 | `packages/rpm/nginx/duynhlab.conf` | upstream block (~5) + location block (~50) | `upstream duynhlab_payments { server 127.0.0.1:8009; }` and `location /api/payments/ { proxy_pass http://duynhlab_payments/; }` |
+| 10 | `scripts/test-install.sh` | binary-check loop (~62), `expected_services` (~107), env-file loop (~122), log-dir loop (~148) | `payments` in all four |
+| 11 | `packages/rpm/nginx/duynhlab.conf` | upstream block (~15) + per-service location(s) | `upstream duynhlab_payments { server 127.0.0.1:8009; }` and one pass-through `location` per exposed audience, e.g. `location /payments/v1/public/ { proxy_pass http://duynhlab_payments; }` (no trailing slash; `internal` is blocked globally) |
 
 Grep guard before committing — every hardcoded list should now contain the new
 name:
@@ -89,7 +85,6 @@ make build-local SERVICE=payments       # binary tarball + build-info.env
 make build-local-all                    # or rebuild everything
 make build                              # mega-RPM with payments inside
 make test-install                       # asserts the new loops you edited in §3
-make test-integration                   # boots all backends incl. payments, /health ×9
 ```
 
 `test-install` failing on a missing binary/env/unit usually means you missed a
@@ -106,8 +101,8 @@ sudo duynhdb migrate payments
 sudo systemctl start duynhlab-payments && curl -fsS localhost:8009/health
 ```
 
-Ship: open the PR (CI runs the same `test-install`; the integration test runs
-after merge), then cut a release per [`005-release.md`](005-release.md) —
+Ship: open the PR (CI runs `test-install`), then cut a release per
+[`005-release.md`](005-release.md) —
 `make release`. The new service appears in the release's composition manifest
 automatically.
 

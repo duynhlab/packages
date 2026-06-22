@@ -112,7 +112,7 @@ gh release download v2026.06.11 --pattern MANIFEST.txt -O - | diff - /opt/duynhl
 | `guard` | "not vYYYY.MM.DD[.N]" | Tag was hand-crafted with the wrong format — use `make release` |
 | `guard` | "not an ancestor of main" | Tag points at unmerged code — merge first, re-tag |
 | `guard` | "Release already exists" | You re-pushed an existing tag — use the re-publish dispatch (§4) |
-| `build-test` | integration test red | Read the "Dump app journal on failure" step — it has `podman logs` + `journalctl` from inside the systemd container |
+| `build-test` | install test red | Read the `test-install` step log; reproduce locally with `make test-install` |
 | `publish` / `deploy` | failed after Release was created | Fix the cause on `main`, then re-publish the tag (§4) — never delete the tag |
 
 ## 8. Where things live
