@@ -186,12 +186,15 @@ Hosted on GitHub Pages, backed by the
 <pre>sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo $BASE_URL/duynhlab.repo
 sudo dnf install -y duynhlab</pre>
 
-<h2>Bootstrap</h2>
-<pre>for svc in auth user product cart order review notification shipping; do
-  SUPERUSER_DSN="postgresql://postgres:secret@localhost:5432/postgres" \\
-    sudo -E duynhdb bootstrap "\$svc"
-  sudo duynhdb migrate "\$svc"
-done
+<h2>Start the platform</h2>
+<p>The database bootstraps itself — a one-shot unit creates every per-service DB
++ roles and runs migrations before the backends start. Same-host PostgreSQL
+works out of the box (local peer auth); just enable the target:</p>
+<pre>sudo systemctl enable --now duynhlab-platform.target</pre>
+<p>For a remote or managed database, point the bootstrap at it <em>first</em>:</p>
+<pre>sudo cp /opt/duynhlab/etc/bootstrap.env.example /etc/duynhlab/bootstrap.env
+sudo chmod 0640 /etc/duynhlab/bootstrap.env
+sudoedit /etc/duynhlab/bootstrap.env   # set SUPERUSER_DSN=postgresql://postgres:...@DBHOST:5432/postgres
 sudo systemctl enable --now duynhlab-platform.target</pre>
 
 <h2>Browse</h2>

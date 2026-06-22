@@ -62,9 +62,9 @@ duynhlab e-commerce platform — single mega-RPM containing:
   * Random password generation on first install (preserved on upgrade)
 
 Install:  dnf install duynhlab
-Bootstrap: duynhdb bootstrap <svc> && duynhdb migrate <svc>
-           (migrate runs the service binary's own embedded migrations)
 Start:    systemctl enable --now duynhlab-platform.target
+          (duynhlab-bootstrap.service auto-creates per-service DBs + roles and
+           runs the binaries' embedded migrations before the backends start)
 
 %prep
 %setup -q -c -T -n duynhlab-%{version}
