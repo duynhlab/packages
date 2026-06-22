@@ -23,7 +23,7 @@ Summary:        duynhlab e-commerce platform (mega-RPM)
 License:        Proprietary
 URL:            https://duynhlab.github.io/packages
 Vendor:         duynhlab
-Packager:       duynhlab ops <ops@duynhlab.io>
+Packager:       duynhlab ops <ops@duynh.me>
 
 Source0:        duynhlab-%{version}-staging.tar.gz
 
@@ -62,9 +62,9 @@ duynhlab e-commerce platform — single mega-RPM containing:
   * Random password generation on first install (preserved on upgrade)
 
 Install:  dnf install duynhlab
-Bootstrap: duynhdb bootstrap <svc> && duynhdb migrate <svc>
-           (migrate runs the service binary's own embedded migrations)
 Start:    systemctl enable --now duynhlab-platform.target
+          (duynhlab-bootstrap.service auto-creates per-service DBs + roles and
+           runs the binaries' embedded migrations before the backends start)
 
 %prep
 %setup -q -c -T -n duynhlab-%{version}
@@ -285,6 +285,6 @@ exit 0
 %ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/shipping.env
 
 %changelog
-* Sun May 24 2026 duynhlab ops <ops@duynhlab.io> - 2026.05.20-1
+* Sun May 24 2026 duynhlab ops <ops@duynh.me> - 2026.05.20-1
 - Initial mega-RPM release.
 - 8 backend services + frontend + common CLI in a single package.
