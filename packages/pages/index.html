@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>duynhlab packages</title>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#222}code,pre{background:#f4f4f4;padding:2px 6px;border-radius:4px}pre{padding:12px;overflow:auto}</style>
+<h1>duynhlab packages</h1>
+<p>YUM repository for the <strong>duynhlab</strong> e-commerce platform.
+Hosted on GitHub Pages, backed by the
+<a href="https://github.com/duynhlab/packages">duynhlab/packages</a> repository.</p>
+
+<h2>Install (Rocky / Alma / RHEL 9)</h2>
+<pre>sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo https://duynhlab.github.io/packages/duynhlab.repo
+sudo dnf install -y duynhlab</pre>
+
+<h2>Start the platform</h2>
+<p>The database bootstraps itself — a one-shot unit creates every per-service DB
++ roles and runs migrations before the backends start. Same-host PostgreSQL
+works out of the box (local peer auth); just enable the target:</p>
+<pre>sudo systemctl enable --now duynhlab-platform.target</pre>
+<p>For a remote or managed database, point the bootstrap at it <em>first</em>:</p>
+<pre>sudo cp /opt/duynhlab/etc/bootstrap.env.example /etc/duynhlab/bootstrap.env
+sudo chmod 0640 /etc/duynhlab/bootstrap.env
+sudoedit /etc/duynhlab/bootstrap.env   # set SUPERUSER_DSN=postgresql://postgres:...@DBHOST:5432/postgres
+sudo systemctl enable --now duynhlab-platform.target</pre>
+
+<h2>Browse</h2>
+<ul>
+  <li><a href="https://github.com/duynhlab/packages/releases">RPM downloads (GitHub Releases)</a></li>
+  <li><a href="rpm/el9/x86_64/repodata/">rpm/el9/x86_64/repodata/</a> (metadata)</li>
+  <li><a href="duynhlab.repo">duynhlab.repo</a></li>
+</ul>

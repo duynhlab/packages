@@ -33,6 +33,19 @@ require_cmd() {
   done
 }
 
+# pick_runner <host-cmd> [override] — echo how to run a tool that may be absent
+# on the host: "host" if <host-cmd> exists, else "podman"/"docker", else die.
+# An explicit non-empty <override> is honored verbatim. Shared by build-rpm.sh
+# (rpmbuild) and publish-yum-repo.sh (createrepo_c).
+pick_runner() {
+  local hostcmd=$1 override=${2:-}
+  if [[ -n "$override" ]]; then printf '%s\n' "$override"; return; fi
+  if command -v "$hostcmd"  >/dev/null 2>&1; then echo host
+  elif command -v podman    >/dev/null 2>&1; then echo podman
+  elif command -v docker    >/dev/null 2>&1; then echo docker
+  else die "No $hostcmd on host and no podman/docker available"; fi
+}
+
 # ── Service registry (hardcoded — single source of truth) ─────────────────────
 # Was parsed from services.yaml via yq; inlined here so the build needs no yq and
 # the RPM ships no registry file. Adding/removing a service = edit THIS block +
