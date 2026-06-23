@@ -36,7 +36,7 @@ env:
 
 jobs:
   build:
-    name: Build & install-test
+    name: Build mega-RPM
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -104,10 +104,6 @@ jobs:
           BUILD_RUNNER: docker
         run: ./scripts/build-rpm.sh
 
-      - name: Install test (Rocky 9)
-        working-directory: packages
-        run: ./scripts/test-install.sh
-
       - name: Collect artifact (RPM + manifest)
         working-directory: packages
         run: |
@@ -125,3 +121,33 @@ jobs:
             packages/dist/MANIFEST.txt
           if-no-files-found: error
           retention-days: 14
+
+  # File-level install test of the built RPM, in parallel across the EL9 rebuilds
+  # we support (Rocky + Alma). Reuses the artifact from `build` — no rebuild.
+  install-test:
+    name: Install test (${{ matrix.image }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [rockylinux:9, almalinux:9]
+    steps:
+      - name: Checkout packages repo
+        uses: actions/checkout@v7
+        with:
+          path: packages
+          ref: ${{ inputs.checkout-ref }}
+
+      - name: Download RPM artifact from build job
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: packages/dist
+
+      - name: Install test (${{ matrix.image }})
+        working-directory: packages
+        env:
+          TEST_IMAGE: ${{ matrix.image }}
+        run: ./scripts/test-install.sh
