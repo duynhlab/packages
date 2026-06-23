@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# test-install.sh — End-to-end install test for the mega-RPM in Rocky 9.
+# test-install.sh — End-to-end install test for the mega-RPM in an EL9 container.
+# Image is set by $TEST_IMAGE (default rockylinux:9); CI runs it as a matrix
+# over rockylinux:9 + almalinux:9.
 #
 # Verifies:
 #   - dnf localinstall succeeds and resolves all dependencies via EPEL + module
@@ -21,18 +23,21 @@ ls "$DIST_DIR"/duynhlab-*.x86_64.rpm >/dev/null 2>&1 \
   || die "No mega-RPM in $DIST_DIR — run scripts/build-rpm.sh"
 
 RUNNER=${CONTAINER_RUNNER:-podman}
+# Base image to install into — any EL9 rebuild (rockylinux:9, almalinux:9, …).
+# The dependency recipe below (EPEL + postgresql:16 module + valkey) is EL9-wide.
+TEST_IMAGE="${TEST_IMAGE:-rockylinux:9}"
 require_cmd "$RUNNER"
 case $RUNNER in
   podman) VOL_OPTS=":Z" ;;
   *)      VOL_OPTS="" ;;
 esac
 
-log_step "Running install test inside rockylinux:9 ($RUNNER)"
+log_step "Running install test inside $TEST_IMAGE ($RUNNER)"
 
 "$RUNNER" run --rm -i \
   -v "$REPO_ROOT:/work$VOL_OPTS" \
   -w /work \
-  rockylinux:9 \
+  "$TEST_IMAGE" \
   bash -eu -o pipefail <<'INNER'
 
 echo "::group::Repo + dependency setup"

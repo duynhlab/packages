@@ -60,7 +60,7 @@ All scripts live in [`scripts/`](../scripts) and source
 >
 > Keep SRPMs only if you ever distribute via Fedora/EPEL or must ship source for
 > compliance — neither applies here.
-| `test-install.sh` | `dist/*.rpm` | — | File-level install check in Rocky 9 |
+| `test-install.sh` | `dist/*.rpm` | — | End-to-end install check in an EL9 container; image via `$TEST_IMAGE` (default `rockylinux:9`). CI runs it as a matrix over `rockylinux:9` + `almalinux:9` |
 
 ### Runner auto-detection
 
@@ -127,7 +127,8 @@ python3 -m http.server -d /tmp/duynhlab-repo 8080
 
 ```mermaid
 flowchart LR
-  PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build<br/>build + install-test]
+  PR[PR / push to main<br/>except docs/** + *.md] --> B[build-rpms: build<br/>build-rpm + upload artifact]
+  B --> IT[build-rpms: install-test<br/>matrix: rocky9, alma9]
   TAG[push tag vYYYY.MM.DD<br/>via make release] --> G[release: guard]
   G --> BT[release: build-test<br/>VERSION = tag]
   BT -->|same artifact| PUB[release: publish]
@@ -138,7 +139,7 @@ flowchart LR
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → test-install → upload artefact (CI-only, 14d). |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → upload artefact (CI-only, 14d). Job `install-test` (`needs: build`): downloads the artefact and runs `test-install.sh` as a **parallel matrix over `rockylinux:9` + `almalinux:9`** (`fail-fast: false`). |
 | **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
 
 **Cutting a release:**
