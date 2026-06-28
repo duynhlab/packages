@@ -94,6 +94,9 @@ jobs:
       version: ${{ needs.guard.outputs.version }}
       checkout-ref: ${{ needs.guard.outputs.tag }}
       artifact-name: duynhlab-release-${{ needs.guard.outputs.tag }}
+      # Compose the RPM from the services' published release binaries
+      # (per services.lock); the frontend is still built from source.
+      source: release
 
   publish:
     name: Publish (Release + YUM repo)
