@@ -28,6 +28,18 @@ flowchart TD
   PUB -->|createrepo_c| GH[gh-pages YUM repo]
 ```
 
+> **Two ways to source the backends.** By default the pipeline **builds from
+> source** (above): `fetch-sources.sh` clones each repo, `build-local.sh`
+> compiles. Alternatively, with **`source=release`** it **downloads the
+> services' published GoReleaser binaries** instead — `fetch-releases.sh` pulls
+> each backend's `v*` GitHub Release tarball (pinned in
+> [`services.lock`](../services.lock)), verifies its `.sha256`, and re-tars it
+> into the same `build/<svc>/raw/` shape, so everything downstream
+> (`stage-all.sh` → `build-rpm.sh`) is identical. The **frontend has no binary
+> release** and is always built from source (npm). Release builds
+> (`release.yml`) use `source=release`; CI (`build.yml`) defaults to
+> `source=local` and can run the release path via `workflow_dispatch`.
+
 ## 2. Scripts
 
 All scripts live in [`scripts/`](../scripts) and source
@@ -36,8 +48,9 @@ All scripts live in [`scripts/`](../scripts) and source
 
 | Script | Input | Output | Purpose |
 |---|---|---|---|
-| `fetch-sources.sh [ref]` | registry (`common.sh`) | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` every service repo at `ref` (default `main`) |
+| `fetch-sources.sh [ref] [type]` | registry (`common.sh`) | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` service repos at `ref` (default `main`). Optional `type` filter clones only that type (the release path passes `static` to clone the frontend only) |
 | `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/*.tar.gz` + `.sha256` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; tar binary + migrations |
+| `fetch-releases.sh [lock]` | [`services.lock`](../services.lock) | `build/<svc>/raw/*.tar.gz` + `.sha256` + `build-info.env` | **(source=release)** Download each backend's published release tarball + `.sha256`, **verify the checksum**, re-tar into build-local's `./bin/...` layout. Frontend skipped (no binary release) |
 | `render-systemd.sh [outdir]` | registry (`common.sh`) + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree + generate the composition manifest (`etc/manifest`) → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba packages/rpm/duynhlab.spec` |
@@ -139,8 +152,8 @@ flowchart LR
 
 | Workflow | File | Trigger | Does |
 |---|---|---|---|
-| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → upload artefact (CI-only, 14d). Job `install-test` (`needs: build`): downloads the artefact and runs `test-install.sh` as a **parallel matrix over `rockylinux:9` + `almalinux:9`** (`fail-fast: false`). |
-| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`**, then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
+| **build-rpms** | [`build.yml`](../.github/workflows/build.yml) | PR + push to `main` (ignores `docs/**` + `**.md`), manual | **Validate only — never publishes.** Job `build`: fetch → build-local → render-systemd → **stage-all** → build-rpm → upload artefact (CI-only, 14d). Job `install-test` (`needs: build`): downloads the artefact and runs `test-install.sh` as a **parallel matrix over `rockylinux:9` + `almalinux:9`** (`fail-fast: false`). `workflow_dispatch` accepts **`source: local\|release`** to exercise either backend-sourcing path (default `local`). |
+| **release** | [`release.yml`](../.github/workflows/release.yml) | push tag `v*` (cut via `make release`), or `workflow_dispatch` to re-publish an existing tag | `guard`: tag is CalVer `vYYYY.MM.DD[.N]`, SHA is on `main`, release doesn't already exist. `build-test`: same pipeline with **`VERSION = tag`** and **`source: release`** (backends composed from their published binaries per [`services.lock`](../services.lock); frontend from source), then test-install on that exact RPM. `publish`: GitHub Release (auto-generated notes + **composition manifest** of the 9 service SHAs, `MANIFEST.txt` asset) → multi-version repodata (**current + 2 previous releases** → `dnf downgrade` works) → orphan `gh-pages` push → `deploy-pages`. Published RPM == tested RPM (same artifact, same run). |
 
 **Cutting a release:**
 
@@ -206,3 +219,6 @@ from `python3 -m http.server`.
 3. Update the hard-coded service loop in
    [`packages/rpm/duynhlab.spec`](../packages/rpm/duynhlab.spec) `%check`/`%post` if the new
    service is a backend (the spec lists the eight backends explicitly).
+4. For a backend consumed via `source=release`, add a tag pin in
+   [`services.lock`](../services.lock) (omit it to track the newest non-draft
+   release).

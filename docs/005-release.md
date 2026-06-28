@@ -22,6 +22,10 @@ Key invariants:
 - **Merging to `main` never publishes.** Only a tag does.
 - **Published == tested** — build, test, and publish happen in one run on one artifact.
 - The RPM's `Version:` always equals the tag (`v2026.06.11` → `duynhlab-2026.06.11-1.el9`).
+- **Backends are composed from their published release binaries** (`source=release`
+  → `fetch-releases.sh`, pinned in [`services.lock`](../services.lock),
+  checksum-verified), not recompiled. The frontend is built from source. So a
+  release ships exactly the service versions pinned in `services.lock`.
 
 ## 2. Cut a release
 
@@ -41,6 +45,25 @@ gh run watch "$(gh run list --workflow=release --limit 1 --json databaseId --jq 
 When the run is green: the Release page has the RPM + `MANIFEST.txt`, and
 `https://duynhlab.github.io/packages` serves metadata indexing the last 3
 releases.
+
+### Bump a service version in the RPM
+
+The released RPM ships the service versions pinned in
+[`services.lock`](../services.lock) (`<svc>=<tag>`, e.g. `auth=v1.0.0`). To pull a
+newer (or older) service release into the next mega-RPM, edit its pin and cut a
+release:
+
+```bash
+# e.g. take auth-service v1.1.0 into the next platform release
+sed -i 's/^auth=.*/auth=v1.1.0/' services.lock
+git add services.lock && git commit -m "Bump auth-service to v1.1.0"
+# open a PR; after merge:
+make release
+```
+
+A service with no line (or `=latest`) tracks its newest non-draft release.
+Validate the release path before cutting with
+`gh workflow run build.yml -f source=release`.
 
 ## 3. Same-day hotfix
 

@@ -34,6 +34,12 @@ flowchart LR
     F --> G
 ```
 
+> **Release builds compose the backends from each service's published release
+> binaries** (`source=release` → `fetch-releases.sh`, pinned in
+> [`services.lock`](services.lock); checksum-verified) instead of compiling from
+> source. The frontend is always built from source (it has no binary release).
+> Local/CI builds default to compiling — see [`docs/004-build.md`](docs/004-build.md).
+
 | | |
 |---|---|
 | **Format** | RPM — EL9 (Rocky · AlmaLinux · RHEL 9), `x86_64` |
