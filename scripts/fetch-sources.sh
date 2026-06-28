@@ -3,8 +3,11 @@
 # (scripts/lib/common.sh) into $DUYNHLAB_SRC_ROOT (default: ../) so
 # build-local.sh can compile them.
 #
-# Usage: scripts/fetch-sources.sh [ref]
-#   ref   git ref to check out (default: main)
+# Usage: scripts/fetch-sources.sh [ref] [type-filter]
+#   ref           git ref to check out (default: main)
+#   type-filter   only clone services of this registry type (e.g. "static").
+#                 Empty = all. Used by the source=release build, which clones
+#                 only the frontend (backends come from fetch-releases.sh).
 #
 # Re-running the script updates existing clones:
 #   * git fetch + git checkout <ref>
@@ -15,10 +18,12 @@ set -euo pipefail
 require_cmd git
 
 REF=${1:-main}
+TYPE_FILTER=${2:-}
 mkdir -p "$DUYNHLAB_SRC_ROOT"
 
 while read -r svc; do
   [[ -n $svc ]] || continue
+  [[ -z "$TYPE_FILTER" || "$(svc_field "$svc" type)" == "$TYPE_FILTER" ]] || continue
   repo=$(svc_field "$svc" repo)
   src_dir=$(svc_field "$svc" src_dir)
   dest="$DUYNHLAB_SRC_ROOT/$src_dir"

@@ -18,9 +18,15 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to check out for every service repo (branch/tag/sha)"
+        description: "Git ref to check out for source-built services (branch/tag/sha)"
         required: false
         default: main
+      source:
+        description: "Backend binaries: 'local' (compile) or 'release' (download per services.lock)"
+        required: false
+        default: local
+        type: choice
+        options: [local, release]
 
 permissions:
   contents: read
@@ -32,3 +38,4 @@ jobs:
     with:
       artifact-name: duynhlab-rpms
       services-ref: ${{ github.event.inputs.ref || 'main' }}
+      source: ${{ github.event.inputs.source || 'local' }}

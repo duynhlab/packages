@@ -1,0 +1,15 @@
+# services.lock — per-service release tag pins for the binary-consumption build
+# (scripts/fetch-releases.sh, source=release). Backends only; the frontend has
+# no binary release and is always built from source.
+#
+# Format: <svc>=<tag>   ('#' comments and blank lines ignored)
+# Bump a service in the mega-RPM by editing its tag here. Set "=latest" (or
+# remove the line) to track the newest non-draft release.
+auth=v1.0.0
+user=v1.0.0
+product=v1.0.0
+cart=v1.0.0
+order=v1.0.0
+review=v1.0.0
+notification=v1.0.0
+shipping=v1.0.0

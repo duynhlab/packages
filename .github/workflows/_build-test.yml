@@ -19,9 +19,13 @@ on:
         type: string
         required: true
       services-ref:
-        description: "Git ref to check out for every service repo."
+        description: "Git ref to check out for source-built services (frontend always; all services when source=local)."
         type: string
         default: "main"
+      source:
+        description: "Backend binaries: 'local' (compile from source) or 'release' (download GitHub Releases per services.lock)."
+        type: string
+        default: "local"
       checkout-ref:
         description: "Ref of THIS repo to build from (empty = triggering sha). Release re-publish passes the tag."
         type: string
@@ -48,6 +52,7 @@ jobs:
           ref: ${{ inputs.checkout-ref }}
 
       - name: Set up Go (GOTOOLCHAIN=auto upgrades as needed per service)
+        if: inputs.source != 'release'
         uses: actions/setup-go@v6
         with:
           go-version: "stable"
@@ -71,11 +76,24 @@ jobs:
           echo "VERSION=$v" >> "$GITHUB_ENV"
           echo "Building version $v"
 
-      - name: Fetch every service source
+      - name: Fetch backend release binaries (source=release)
+        if: inputs.source == 'release'
         working-directory: packages
-        run: ./scripts/fetch-sources.sh "${{ inputs.services-ref }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/fetch-releases.sh
 
-      - name: Build all services (binaries + frontend dist)
+      - name: Fetch service source (frontend always; all repos when source=local)
+        working-directory: packages
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.source }}" = "release" ]; then
+            ./scripts/fetch-sources.sh "${{ inputs.services-ref }}" static
+          else
+            ./scripts/fetch-sources.sh "${{ inputs.services-ref }}"
+          fi
+
+      - name: Build services from source (frontend always; backends when source=local)
         working-directory: packages
         # fetch-sources.sh already checked out the requested services-ref; tell
         # build-local.sh to build the tree as-is instead of re-syncing to main
@@ -85,6 +103,11 @@ jobs:
         run: |
           set -euo pipefail
           for svc in $(bash -c '. scripts/lib/common.sh && svc_list'); do
+            type=$(bash -c ". scripts/lib/common.sh && svc_field $svc type")
+            if [ "${{ inputs.source }}" = "release" ] && [ "$type" = "backend" ]; then
+              echo "skip build-local $svc (staged from release)"
+              continue
+            fi
             echo "::group::build-local $svc"
             ./scripts/build-local.sh "$svc" "$VERSION"
             echo "::endgroup::"

@@ -70,12 +70,16 @@ grep -rn "notification shipping" scripts/ packages/ | grep -v payments && echo "
 ## 4. What you do NOT touch (dynamic)
 
 Build scripts read the §2 registry via the `svc_*` accessors:
-`fetch-sources.sh`, `build-local.sh`, `render-systemd.sh` (unit + platform
-target), `stage-all.sh` (staging + composition manifest), `Makefile
-build-local-all`. At runtime, `duynhctl` (list/health/ports) discovers services
-from the installed payload (`/opt/duynhlab/*/` + `PORT` in `<svc>.env`),
-`password-generator.sh` scans `secret-tpl/*.env.tpl`, and `duynhdb` takes a
-per-service arg. None need edits.
+`fetch-sources.sh`, `build-local.sh`, `fetch-releases.sh` (release path —
+backends only), `render-systemd.sh` (unit + platform target), `stage-all.sh`
+(staging + composition manifest), `Makefile build-local-all`. At runtime,
+`duynhctl` (list/health/ports) discovers services from the installed payload
+(`/opt/duynhlab/*/` + `PORT` in `<svc>.env`), `password-generator.sh` scans
+`secret-tpl/*.env.tpl`, and `duynhdb` takes a per-service arg. None need edits.
+
+> One exception for **backends consumed via `source=release`**: add a tag pin in
+> [`services.lock`](../services.lock) (omit it to track the newest release). See
+> [`004-build.md`](004-build.md) § 7.
 
 ## 5. Build & verify locally
 
