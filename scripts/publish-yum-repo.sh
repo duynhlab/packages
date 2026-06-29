@@ -69,9 +69,8 @@ case "$runner" in
     createrepo_c "${cr_args[@]}" "$CR_INPUT"
     ;;
   podman|docker)
-    sel=""; [[ "$runner" == "podman" ]] && sel=":Z"
     "$runner" run --rm \
-      -v "$CR_INPUT:/cr_input${sel}" \
+      -v "$CR_INPUT:/cr_input" \
       -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
       rockylinux:9 bash -c '
         set -e

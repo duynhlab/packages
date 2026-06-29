@@ -41,18 +41,14 @@ mkdir -p "$OPT"/{etc,lib,nginx,valkey,postgresql,secret-tpl,logrotate}
 # ── 1. Per-service backends ───────────────────────────────────────────────────
 extract_backend() {
   local svc=$1 raw_dir="$BUILD_DIR/$svc/raw"
-  [[ -d "$raw_dir" ]] || die "Missing build/$svc/raw — run scripts/build-local.sh"
+  local payload="$raw_dir/payload" info="$raw_dir/build-info.env"
 
-  local bin_tgz info
-  bin_tgz=$(ls "$raw_dir"/*-linux-amd64.tar.gz 2>/dev/null | head -1)
-  info="$raw_dir/build-info.env"
-
-  [[ -f "$bin_tgz" ]] || die "Missing binary tarball for $svc in $raw_dir"
+  [[ -d "$payload" ]] || die "Missing build/$svc/raw/payload — run scripts/build-local.sh or fetch-releases.sh"
   [[ -f "$info"    ]] || die "Missing build-info.env for $svc"
 
   local dst="$OPT/$svc"
-  mkdir -p "$dst/bin"
-  tar -xzf "$bin_tgz" --strip-components=1 -C "$dst"
+  mkdir -p "$dst"
+  cp -a "$payload/." "$dst/"
 
   # SCHEMA_VERSION (audit-only): highest embedded migration, recorded by
   # build-local.sh into build-info.env. Migrations themselves ship inside the
@@ -63,7 +59,7 @@ extract_backend() {
   printf '%s\n' "${SCHEMA_VERSION:-1}"  > "$dst/SCHEMA_VERSION"
 
   chmod 0755 "$dst/bin"/* 2>/dev/null || :
-  log_ok "staged $svc ($(basename "$bin_tgz"))"
+  log_ok "staged $svc"
 }
 
 while read -r svc; do
@@ -76,11 +72,11 @@ while read -r svc; do
 done < <(svc_list)
 
 # ── 2. Frontend (static) ──────────────────────────────────────────────────────
-frontend_tgz=$(ls "$BUILD_DIR/frontend/raw"/*-dist.tar.gz 2>/dev/null | head -1)
-[[ -f "$frontend_tgz" ]] || die "Missing frontend dist tarball"
+fe_payload="$BUILD_DIR/frontend/raw/payload"
+[[ -d "$fe_payload/dist" ]] || die "Missing frontend payload — run scripts/build-local.sh frontend"
 mkdir -p "$OPT/frontend"
-tar -xzf "$frontend_tgz" -C "$OPT/frontend"
-[[ -f "$OPT/frontend/dist/index.html" ]] || die "frontend/dist/index.html missing after extract"
+cp -a "$fe_payload/." "$OPT/frontend/"
+[[ -f "$OPT/frontend/dist/index.html" ]] || die "frontend/dist/index.html missing after copy"
 log_ok "staged frontend"
 
 # ── 3. CLI tools + library scripts ────────────────────────────────────────────

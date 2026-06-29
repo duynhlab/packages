@@ -12,7 +12,7 @@ Group=duynhlab
 WorkingDirectory=/opt/duynhlab/${SERVICE_NAME}
 
 EnvironmentFile=-/etc/duynhlab/env-global.properties
-${EXTRA_ENV_FILES}EnvironmentFile=/etc/duynhlab/${SERVICE_NAME}.env
+EnvironmentFile=/etc/duynhlab/${SERVICE_NAME}.env
 EnvironmentFile=-/etc/duynhlab/${SERVICE_NAME}.override
 
 ExecStart=/opt/duynhlab/${SERVICE_NAME}/bin/${BINARY_NAME}

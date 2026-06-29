@@ -4,10 +4,9 @@
 # Runs rpmbuild against packages/rpm/duynhlab.spec using:
 #   $BUILD_DIR/sources/duynhlab-${VERSION}-staging.tar.gz   (produced by stage-all.sh)
 #
-# Runner selection ($BUILD_RUNNER):
+# Runner selection ($BUILD_RUNNER, auto via pick_runner):
 #   host    — use the host rpmbuild (rpm-build package required)
-#   podman  — run inside rockylinux:9 container (default if host lacks rpmbuild)
-#   docker  — same as podman, with docker
+#   docker  — run inside rockylinux:9 container (default if host lacks rpmbuild)
 #
 # Output: dist/duynhlab-${VERSION}-1.el9.x86_64.rpm
 set -euo pipefail
@@ -41,11 +40,8 @@ run_container_build() {
   local image="${BUILD_IMAGE:-rockylinux:9}"
   log_step "running rpmbuild in $runtime container ($image)"
 
-  local sel=""
-  [[ "$runtime" == "podman" ]] && sel=":Z"
-
   $runtime run --rm \
-    -v "$REPO_ROOT:/workspace${sel}" \
+    -v "$REPO_ROOT:/workspace" \
     -w /workspace \
     -e VERSION="$VERSION" \
     "$image" \

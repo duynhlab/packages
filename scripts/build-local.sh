@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # scripts/build-local.sh — Phase 1.0 (D22): build a service from a sibling
-# checkout under $DUYNHLAB_SRC_ROOT (default: ../) and stage tarballs into
-# build/<service>/raw/, mimicking what fetch-release.sh will produce in CI.
+# checkout under $DUYNHLAB_SRC_ROOT (default: ../) and stage the extracted
+# payload into build/<service>/raw/payload/, mimicking what fetch-releases.sh
+# produces in CI so stage-all.sh consumes both modes identically.
 #
 # Usage: build-local.sh <service> [version]
 #   - Reads the registry (scripts/lib/common.sh) for repo / binary / build_path
 #   - cd $DUYNHLAB_SRC_ROOT/<src_dir>
 #   - git fetch && checkout main && pull --ff-only (unless DUYNHLAB_NO_GIT=1)
-#   - go build (CGO=0, GOOS=linux GOARCH=amd64)
-#   - tar -> build/<svc>/raw/<binary>-<ver>-linux-amd64.tar.gz
-#   - SHA256 alongside the tarball
-#   - Migrations are embedded in the binary (//go:embed) — NOT tarred (D24). The
+#   - go build (CGO=0, GOOS=linux GOARCH=amd64) -> build/<svc>/raw/payload/bin/<binary>
+#   - Migrations are embedded in the binary (//go:embed) — NOT staged (D24). The
 #     highest migration version is recorded in build-info.env as SCHEMA_VERSION (audit).
 #   - Frontend (type=static): bake build.env (VITE_*) then npm ci && npm run build
-#     -> frontend-dist.tar.gz
+#     -> build/<svc>/raw/payload/dist/
 
 set -euo pipefail
 
@@ -94,26 +93,20 @@ case "$TYPE" in
     [[ -n "$BUILD_PATH" ]] || die "build_path not set for $SERVICE"
 
     log_step "go build $BUILD_PATH -> $BINARY ($GOOS/$GOARCH)"
-    STAGE=$(mktemp -d)
-    trap 'rm -rf "$STAGE"' EXIT
-
-    mkdir -p "$STAGE/bin"
+    PAYLOAD="$RAW_DIR/payload"
+    mkdir -p "$PAYLOAD/bin"
     ( cd "$SRC_PATH"
       CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
       GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" \
         go build -trimpath -ldflags="-s -w -X main.version=$VERSION" \
-        -o "$STAGE/bin/$BINARY" "$BUILD_PATH"
+        -o "$PAYLOAD/bin/$BINARY" "$BUILD_PATH"
     )
-    [[ -x "$STAGE/bin/$BINARY" ]] || die "Build did not produce $STAGE/bin/$BINARY"
+    [[ -x "$PAYLOAD/bin/$BINARY" ]] || die "Build did not produce $PAYLOAD/bin/$BINARY"
 
     for f in LICENSE README.md; do
-      [[ -f "$SRC_PATH/$f" ]] && cp "$SRC_PATH/$f" "$STAGE/" || true
+      [[ -f "$SRC_PATH/$f" ]] && cp "$SRC_PATH/$f" "$PAYLOAD/" || true
     done
-
-    TARBALL="$RAW_DIR/${BINARY}-${VERSION}-${GOOS}-${GOARCH}.tar.gz"
-    tar -czf "$TARBALL" -C "$STAGE" .
-    sha256_of "$TARBALL" > "${TARBALL}.sha256"
-    log_ok "Binary tarball: ${TARBALL#$REPO_ROOT/} ($(du -h "$TARBALL" | cut -f1), sha256=$(cut -c1-12 < "${TARBALL}.sha256"))"
+    log_ok "Binary payload: ${PAYLOAD#$REPO_ROOT/}/bin/$BINARY ($(du -sh "$PAYLOAD" | cut -f1))"
 
     # Migrations are embedded in the binary (//go:embed); we do NOT ship loose SQL.
     # Record the highest migration version for audit (SCHEMA_VERSION in build-info.env).
@@ -140,26 +133,17 @@ case "$TYPE" in
     done < <(svc_build_env "$SERVICE")
 
     log_step "npm ci && npm run build -> dist/"
-    STAGE=$(mktemp -d)
-    trap 'rm -rf "$STAGE"' EXIT
-
     ( cd "$SRC_PATH"
       npm ci
       env ${BUILD_ENV[@]+"${BUILD_ENV[@]}"} npm run build
     )
 
-    # Find build output (vite=dist, next=.next or out, cra=build)
-    OUT=""
-    for cand in dist build out .next/standalone; do
-      if [[ -d "$SRC_PATH/$cand" ]]; then OUT="$SRC_PATH/$cand"; break; fi
-    done
-    [[ -n "$OUT" ]] || die "Cannot locate frontend build output (tried dist/build/out/.next/standalone)"
-    log_step "Output dir: ${OUT#$SRC_PATH/}"
+    [[ -d "$SRC_PATH/dist" ]] || die "Frontend build produced no dist/ (expected Vite output)"
 
-    TARBALL="$RAW_DIR/frontend-${VERSION}-dist.tar.gz"
-    tar -czf "$TARBALL" -C "$(dirname "$OUT")" "$(basename "$OUT")"
-    sha256_of "$TARBALL" > "${TARBALL}.sha256"
-    log_ok "Frontend tarball: ${TARBALL#$REPO_ROOT/} ($(du -h "$TARBALL" | cut -f1))"
+    PAYLOAD="$RAW_DIR/payload"
+    mkdir -p "$PAYLOAD"
+    cp -a "$SRC_PATH/dist" "$PAYLOAD/dist"
+    log_ok "Frontend payload: ${PAYLOAD#$REPO_ROOT/}/dist ($(du -sh "$PAYLOAD/dist" | cut -f1))"
     ;;
 
   *)
