@@ -1,9 +1,19 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>duynhlab packages</title>
-<style>body{font-family:system-ui,sans-serif;max-width:620px;margin:56px auto;padding:0 20px;color:#222;line-height:1.6}pre{background:#f4f4f4;padding:14px;border-radius:6px;overflow:auto}a{color:#0969da}</style>
+<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;color:#222}code,pre{background:#f4f4f4;padding:2px 6px;border-radius:4px}pre{padding:12px;overflow:auto}</style>
 <h1>duynhlab packages</h1>
-<p>YUM repo for the <strong>duynhlab</strong> platform · EL9 · x86_64.</p>
+<p>YUM repository for the <strong>duynhlab</strong> e-commerce platform.
+Hosted on GitHub Pages, backed by the
+<a href="https://github.com/duynhlab/packages">duynhlab/packages</a> repository.</p>
+
+<h2>Install (Rocky / Alma / RHEL 9)</h2>
 <pre>sudo curl -fsSL -o /etc/yum.repos.d/duynhlab.repo https://duynhlab.github.io/packages/duynhlab.repo
 sudo dnf install -y duynhlab</pre>
-<p><a href="https://github.com/duynhlab/packages/releases">Releases</a> · <a href="duynhlab.repo">duynhlab.repo</a> · <a href="rpm/el9/x86_64/repodata/">repodata</a> · <a href="https://github.com/duynhlab/packages">source</a></p>
+
+<h2>Browse</h2>
+<ul>
+  <li><a href="https://github.com/duynhlab/packages/releases">RPM downloads (GitHub Releases)</a></li>
+  <li><a href="rpm/el9/x86_64/repodata/">rpm/el9/x86_64/repodata/</a> (metadata)</li>
+  <li><a href="duynhlab.repo">duynhlab.repo</a></li>
+</ul>
