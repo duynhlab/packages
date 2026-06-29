@@ -14,7 +14,7 @@ flowchart TD
   YML[registry<br/>scripts/lib/common.sh] --> FS[fetch-sources.sh]
   FS -->|git clone/pull| SRC[(../&lt;svc&gt;-service)]
   SRC --> BL[build-local.sh]
-  BL -->|go build / npm build<br/>+ tar + sha256| RAW[build/&lt;svc&gt;/raw/]
+  BL -->|go build / npm build| RAW[build/&lt;svc&gt;/raw/payload/]
   YML --> RS[render-systemd.sh]
   RS --> UNITS[build/systemd/*.service<br/>+ duynhlab-platform.target]
   RAW --> SA[stage-all.sh]
@@ -33,9 +33,10 @@ flowchart TD
 > compiles. Alternatively, with **`source=release`** it **downloads the
 > services' published GoReleaser binaries** instead — `fetch-releases.sh` pulls
 > each backend's `v*` GitHub Release tarball (pinned in
-> [`services.lock`](../services.lock)), verifies its `.sha256`, and re-tars it
-> into the same `build/<svc>/raw/` shape, so everything downstream
-> (`stage-all.sh` → `build-rpm.sh`) is identical. The **frontend has no binary
+> [`services.lock`](../services.lock)), verifies its `.sha256`, and extracts it
+> into the same `build/<svc>/raw/payload/` shape `build-local.sh` produces, so
+> everything downstream (`stage-all.sh` → `build-rpm.sh`) is identical. The
+> **frontend has no binary
 > release** and is always built from source (npm). Release builds
 > (`release.yml`) use `source=release`; CI (`build.yml`) defaults to
 > `source=local` and can run the release path via `workflow_dispatch`.
@@ -49,8 +50,8 @@ All scripts live in [`scripts/`](../scripts) and source
 | Script | Input | Output | Purpose |
 |---|---|---|---|
 | `fetch-sources.sh [ref] [type]` | registry (`common.sh`) | `$DUYNHLAB_SRC_ROOT/<svc>` | `git clone`/`pull` service repos at `ref` (default `main`). Optional `type` filter clones only that type (the release path passes `static` to clone the frontend only) |
-| `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/*.tar.gz` + `.sha256` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; tar binary + migrations |
-| `fetch-releases.sh [lock]` | [`services.lock`](../services.lock) | `build/<svc>/raw/*.tar.gz` + `.sha256` + `build-info.env` | **(source=release)** Download each backend's published release tarball + `.sha256`, **verify the checksum**, re-tar into build-local's `./bin/...` layout. Frontend skipped (no binary release) |
+| `build-local.sh <svc> [ver]` | sibling checkout | `build/<svc>/raw/payload/` + `build-info.env` | Compile one service (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm build` for frontend; stage the binary (`bin/<svc>-service`) or `dist/` as an extracted payload tree |
+| `fetch-releases.sh [lock]` | [`services.lock`](../services.lock) | `build/<svc>/raw/payload/` + `build-info.env` | **(source=release)** Download each backend's published release tarball + `.sha256`, **verify the checksum**, extract into the same `payload/` layout `build-local.sh` produces. Frontend skipped (no binary release) |
 | `render-systemd.sh [outdir]` | registry (`common.sh`) + tmpl | `build/systemd/` | Render per-service `.service` + `duynhlab-platform.target` |
 | `stage-all.sh` | `build/*/raw/` + units | `build/sources/duynhlab-<ver>-staging.tar.gz` | Assemble the FHS payload tree + generate the composition manifest (`etc/manifest`) → Source0 tarball |
 | `build-rpm.sh` | Source0 + spec | `dist/*.rpm` | `rpmbuild -ba packages/rpm/duynhlab.spec` |
@@ -81,12 +82,12 @@ All scripts live in [`scripts/`](../scripts) and source
 `createrepo_c`:
 
 ```
-BUILD_RUNNER      = host | podman | docker   (build-rpm.sh)
-CREATEREPO_RUNNER = host | podman | docker   (publish-yum-repo.sh)
+BUILD_RUNNER      = host | docker   (build-rpm.sh)
+CREATEREPO_RUNNER = host | docker   (publish-yum-repo.sh)
 ```
 
-If unset, they prefer a host binary, then `podman`, then `docker`. Container
-builds use `rockylinux:9` (override with `BUILD_IMAGE`).
+If unset, they prefer a host binary, else `docker`. Container builds use
+`rockylinux:9` (override with `BUILD_IMAGE`).
 
 ## 3. Makefile
 
@@ -112,7 +113,7 @@ Environment knobs:
 |---|---|---|
 | `VERSION` | `$(date -u +%Y.%m.%d)` | RPM version (CalVer) |
 | `DUYNHLAB_SRC_ROOT` | `..` (sibling dir) | Where service repos are cloned |
-| `BUILD_RUNNER` | auto | `host`/`podman`/`docker` for rpmbuild |
+| `BUILD_RUNNER` | auto | `host`/`docker` for rpmbuild |
 
 ## 4. Local build walkthrough
 

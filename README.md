@@ -88,7 +88,7 @@ make build                  # stage Source0 tarball + rpmbuild -> dist/*.rpm
 make test-install           # file-level install check in Rocky 9
 ```
 
-`BUILD_RUNNER=host|podman|docker` is auto-detected. Full pipeline, scripts, and Makefile
+`BUILD_RUNNER=host|docker` is auto-detected. Full pipeline, scripts, and Makefile
 reference: **[`docs/004-build.md`](docs/004-build.md)**.
 
 ## CI / Release
