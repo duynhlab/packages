@@ -23,17 +23,11 @@ while read -r svc; do
 
   binary=$(svc_field "$svc" binary)
   after_list=$(svc_field_list "$svc" dependencies.after | sed 's/^/ /' | tr -d '\n')
-  env_lines=""
-  while read -r env_path; do
-    [[ -z "$env_path" ]] && continue
-    env_lines+="EnvironmentFile=-${env_path}"$'\n'
-  done < <(svc_field_list "$svc" dependencies.env_files)
 
   SERVICE_NAME="$svc" \
   BINARY_NAME="$binary" \
   EXTRA_AFTER="$after_list" \
-  EXTRA_ENV_FILES="$env_lines" \
-    envsubst '$SERVICE_NAME $BINARY_NAME $EXTRA_AFTER $EXTRA_ENV_FILES' \
+    envsubst '$SERVICE_NAME $BINARY_NAME $EXTRA_AFTER' \
     < "$UNIT_TPL" > "$OUT_DIR/duynhlab-$svc.service"
 
   WANTS+="Wants=duynhlab-$svc.service"$'\n'

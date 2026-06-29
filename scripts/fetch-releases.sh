@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # fetch-releases.sh — Download released BACKEND binaries from each service's
-# GitHub Release (GoReleaser) and stage them into build/<svc>/raw/ in EXACTLY
-# the shape build-local.sh produces, so scripts/stage-all.sh consumes them
-# unchanged. This is the "consume the release instead of compiling" path; the
-# source path lives in fetch-sources.sh + build-local.sh.
+# GitHub Release (GoReleaser) and extract them into build/<svc>/raw/payload/ in
+# EXACTLY the shape build-local.sh produces, so scripts/stage-all.sh consumes
+# both modes unchanged. This is the "consume the release instead of compiling"
+# path; the source path lives in fetch-sources.sh + build-local.sh.
 #
 # Usage: scripts/fetch-releases.sh [lock-file]
 #   lock-file   per-service version pins (default: <repo>/services.lock).
@@ -47,26 +47,20 @@ resolve_tag() {
   printf '%s\n' "$tag"
 }
 
-# verify_sha256 <dir> <tarball-basename> — check <tarball>.sha256 (GoReleaser
-# split-checksum format "<hash>  <name>"); fall back to a manual hash compare.
+# verify_sha256 <dir> <tarball-basename> — check <tarball>.sha256
+# (GoReleaser split-checksum format "<hash>  <name>").
 verify_sha256() {
   local dir=$1 tgz=$2 sumfile="$2.sha256"
   ( cd "$dir"
     [[ -f "$sumfile" ]] || die "Missing checksum $sumfile for $tgz"
-    if ! sha256sum -c "$sumfile" >/dev/null 2>&1; then
-      # Some producers write only the bare hash — compare manually.
-      local want got
-      want=$(awk '{print $1}' "$sumfile")
-      got=$(sha256_of "$tgz")
-      [[ "$want" == "$got" ]] || die "Checksum mismatch for $tgz (want $want, got $got)"
-    fi
+    sha256sum -c "$sumfile" >/dev/null 2>&1 || die "Checksum mismatch for $tgz"
   )
   log_ok "checksum verified: $tgz"
 }
 
 fetch_one() {
   local svc=$1
-  local repo binary tag tmp rel_tgz stage raw_dir out_tgz ver
+  local repo binary tag tmp rel_tgz raw_dir
   repo=$(svc_field "$svc" repo)
   binary=$(svc_field "$svc" binary)
   [[ -n "$binary" ]] || die "binary not set for $svc"
@@ -90,25 +84,15 @@ fetch_one() {
 
   verify_sha256 "$tmp" "$rel_tgz"
 
-  # Normalise layout: the release tarball's first path component is bin/<binary>
-  # (no leading ./), but stage-all.sh extracts with --strip-components=1 expecting
-  # build-local.sh's "./bin/..." shape. Re-tar via a staging dir so stage-all
-  # stays byte-for-byte unchanged.
-  stage=$(mktemp -d)
-  tar -xzf "$tmp/$rel_tgz" -C "$stage"
-  [[ -x "$stage/bin/$binary" ]] || die "Release tarball missing bin/$binary"
-
+  # Extract straight into raw/payload/ — the same shape build-local.sh stages,
+  # so stage-all.sh copies both modes identically (no re-tar, no strip-components).
   raw_dir="$BUILD_DIR/$svc/raw"
-  rm -rf "$raw_dir"; mkdir -p "$raw_dir"
-
-  ver=$(. "$tmp/build-info.env"; printf '%s' "${VERSION:-${tag#v}}")
-  out_tgz="$raw_dir/${binary}-${ver}-linux-amd64.tar.gz"
-  tar -czf "$out_tgz" -C "$stage" .
-  sha256_of "$out_tgz" > "$out_tgz.sha256"
+  rm -rf "$raw_dir"; mkdir -p "$raw_dir/payload"
+  tar -xzf "$tmp/$rel_tgz" -C "$raw_dir/payload"
+  [[ -x "$raw_dir/payload/bin/$binary" ]] || die "Release tarball missing bin/$binary"
   cp "$tmp/build-info.env" "$raw_dir/build-info.env"
-  rm -rf "$stage"
 
-  log_ok "staged $svc from release ($rel_tgz, version $ver)"
+  log_ok "staged $svc from release ($rel_tgz)"
 }
 
 while read -r svc; do

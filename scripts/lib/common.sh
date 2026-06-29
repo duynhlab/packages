@@ -34,16 +34,15 @@ require_cmd() {
 }
 
 # pick_runner <host-cmd> [override] — echo how to run a tool that may be absent
-# on the host: "host" if <host-cmd> exists, else "podman"/"docker", else die.
-# An explicit non-empty <override> is honored verbatim. Shared by build-rpm.sh
-# (rpmbuild) and publish-yum-repo.sh (createrepo_c).
+# on the host: "host" if <host-cmd> exists, else "docker", else die. An explicit
+# non-empty <override> is honored verbatim. Shared by build-rpm.sh (rpmbuild)
+# and publish-yum-repo.sh (createrepo_c).
 pick_runner() {
   local hostcmd=$1 override=${2:-}
   if [[ -n "$override" ]]; then printf '%s\n' "$override"; return; fi
-  if command -v "$hostcmd"  >/dev/null 2>&1; then echo host
-  elif command -v podman    >/dev/null 2>&1; then echo podman
-  elif command -v docker    >/dev/null 2>&1; then echo docker
-  else die "No $hostcmd on host and no podman/docker available"; fi
+  if command -v "$hostcmd" >/dev/null 2>&1; then echo host
+  elif command -v docker   >/dev/null 2>&1; then echo docker
+  else die "No $hostcmd on host and no docker available"; fi
 }
 
 # ── Service registry (hardcoded — single source of truth) ─────────────────────
@@ -68,8 +67,7 @@ declare -A _SVC=(
   [frontend|repo]=duynhlab/frontend  [frontend|src_dir]=frontend  [frontend|binary]=  [frontend|build_path]=  [frontend|port]=8080  [frontend|type]=static
 )
 
-# Array field dependencies.after (space-separated). Only set where non-empty;
-# dependencies.env_files is empty for every service today.
+# Array field dependencies.after (space-separated). Only set where non-empty.
 declare -A _SVC_AFTER=(
   [frontend]="nginx.service"
 )
@@ -99,12 +97,10 @@ svc_field() {
 # `set -e`/pipefail don't abort, matching the old `yq '...[]?'` behaviour.
 svc_field_list() {
   local name=$1 field=$2
-  case "$field" in
-    dependencies.after)
-      local v=${_SVC_AFTER[$name]:-}
-      [[ -n $v ]] && printf '%s\n' $v ;;     # unquoted: split into one line each
-    dependencies.env_files) ;;               # none for any service
-  esac
+  if [[ "$field" == "dependencies.after" ]]; then
+    local v=${_SVC_AFTER[$name]:-}
+    [[ -n $v ]] && printf '%s\n' $v     # unquoted: split into one line each
+  fi
   return 0
 }
 
@@ -119,13 +115,4 @@ svc_build_env() {
 svc_exists() {
   local name=$1
   svc_list | grep -qx "$name"
-}
-
-# ── Misc ──────────────────────────────────────────────────────────────────────
-sha256_of() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
-  else
-    shasum -a 256 "$1" | awk '{print $1}'
-  fi
 }
