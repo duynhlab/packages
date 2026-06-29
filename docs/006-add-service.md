@@ -85,7 +85,7 @@ backends only), `render-systemd.sh` (unit + platform target), `stage-all.sh`
 
 ```bash
 make fetch-sources                      # clones payments-service alongside
-make build-local SERVICE=payments       # binary tarball + build-info.env
+make build-local SERVICE=payments       # binary payload + build-info.env
 make build-local-all                    # or rebuild everything
 make build                              # mega-RPM with payments inside
 make test-install                       # asserts the new loops you edited in §3
