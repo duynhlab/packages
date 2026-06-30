@@ -35,14 +35,14 @@ with migrations embedded (`<binary> migrate`).
 
 | Service | Binary | HTTP | gRPC | Database | systemd unit |
 |---|---|---|---|---|---|
-| auth | `/opt/duynhlab/auth/bin/auth-service` | 8001 | 9001 | `duynhlab_auth` | `duynhlab-auth.service` |
-| user | `/opt/duynhlab/user/bin/user-service` | 8002 | — | `duynhlab_user` | `duynhlab-user.service` |
-| product | `/opt/duynhlab/product/bin/product-service` | 8003 | — | `duynhlab_product` | `duynhlab-product.service` |
-| cart | `/opt/duynhlab/cart/bin/cart-service` | 8004 | — | `duynhlab_cart` | `duynhlab-cart.service` |
-| order | `/opt/duynhlab/order/bin/order-service` | 8005 | — | `duynhlab_order` | `duynhlab-order.service` |
-| review | `/opt/duynhlab/review/bin/review-service` | 8006 | 9006 | `duynhlab_review` | `duynhlab-review.service` |
-| notification | `/opt/duynhlab/notification/bin/notification-service` | 8007 | 9007 | `duynhlab_notification` | `duynhlab-notification.service` |
-| shipping | `/opt/duynhlab/shipping/bin/shipping-service` | 8008 | 9008 | `duynhlab_shipping` | `duynhlab-shipping.service` |
+| auth | `/opt/duynhlab/auth/bin/auth-service` | 8001 | 9001 | `auth` | `duynhlab-auth.service` |
+| user | `/opt/duynhlab/user/bin/user-service` | 8002 | — | `user` | `duynhlab-user.service` |
+| product | `/opt/duynhlab/product/bin/product-service` | 8003 | — | `product` | `duynhlab-product.service` |
+| cart | `/opt/duynhlab/cart/bin/cart-service` | 8004 | — | `cart` | `duynhlab-cart.service` |
+| order | `/opt/duynhlab/order/bin/order-service` | 8005 | — | `order` | `duynhlab-order.service` |
+| review | `/opt/duynhlab/review/bin/review-service` | 8006 | 9006 | `review` | `duynhlab-review.service` |
+| notification | `/opt/duynhlab/notification/bin/notification-service` | 8007 | 9007 | `notification` | `duynhlab-notification.service` |
+| shipping | `/opt/duynhlab/shipping/bin/shipping-service` | 8008 | 9008 | `shipping` | `duynhlab-shipping.service` |
 | frontend | `/opt/duynhlab/frontend/dist/` (static SPA, served by nginx) | 8080 (vhost) | — | — | — |
 
 Per-service audit files next to each binary (`/opt/duynhlab/<svc>/`):
@@ -64,7 +64,8 @@ Everything here is replaced wholesale on upgrade — never edit it in place.
 | `nginx/duynhlab-frontend.conf` | Optional standalone frontend vhost (NOT auto-installed) | payload |
 | `valkey/duynhlab.conf` | Valkey snippet template | payload |
 | `postgresql/duynhlab-tuning.conf` | PostgreSQL tuning template | payload |
-| `postgresql/bootstrap.sql` | DB/role bootstrap template, applied by `duynhdb bootstrap` | payload |
+| `postgresql/init-users.sql` | Per-service login role (idempotent), applied by `duynhlab-bootstrap` with `-v role= -v pass=` | payload |
+| `postgresql/init-databases.sql` | One database per service, owned by its role (idempotent), applied once by `duynhlab-bootstrap` | payload |
 | `logrotate/duynhlab-services`, `logrotate/duynhlab-nginx` | logrotate rule templates | payload |
 | `etc/env-global.properties` | Global defaults master copy (`DUYNHLAB_VERSION`, `LOG_LEVEL`, `DB_HOST`…) | payload |
 | `etc/bootstrap.env.example` | Commented `SUPERUSER_DSN` example for a remote DB; copy to `/etc/duynhlab/bootstrap.env` | payload |

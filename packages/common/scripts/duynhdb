@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
-# duynhdb — manage per-service PostgreSQL databases on duynhlab hosts.
+# duynhdb — per-service PostgreSQL helper on duynhlab hosts.
 #
 # Subcommands:
-#   bootstrap <svc>   CREATE DATABASE + CREATE USER + GRANT (needs SUPERUSER_DSN)
-#   migrate   <svc>   Run pending migrations by exec'ing the service binary's own
-#                     `migrate` subcommand (golang-migrate embedded via pkg/migratex)
-#   status    <svc>   Print installed schema_migrations version vs shipped SCHEMA_VERSION
+#   migrate <svc>   Run pending migrations by exec'ing the service binary's own
+#                   `migrate` subcommand (golang-migrate embedded via pkg/migratex),
+#                   connecting as the service's role.
+#   status  <svc>   Print installed schema_migrations version vs shipped SCHEMA_VERSION.
 #
-# Migrations are forward-only and embedded in each service binary (//go:embed) — this
-# repo ships no separate migrate tool and no loose SQL. See plan.md D23/D24.
+# Database + role creation is done by duynhlab-bootstrap (the postgres superuser
+# applies postgresql/init-users.sql + init-databases.sql) — not here. One role per
+# service, named after the service, owns its same-named database; the service and
+# its migrations both connect as that role.
+#
+# Migrations are forward-only and embedded in each service binary (//go:embed) —
+# this repo ships no separate migrate tool and no loose SQL. See plan.md D23/D24.
 #
 # Env (read from /etc/duynhlab/<svc>.env):
 #   DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_SSLMODE
-#   DB_MIGRATOR_USER DB_MIGRATOR_PASSWORD (migrate/status run as the migrator role)
-# Extra env for bootstrap:
-#   SUPERUSER_DSN=postgresql://postgres:secret@host:5432/postgres  (remote DB)
-#   — leave unset for a same-host DB: bootstrap uses local peer auth as `postgres`.
 
 set -euo pipefail
 
@@ -28,16 +29,14 @@ info() { echo "$PROG: $*" >&2; }
 
 usage() {
   cat >&2 <<EOF
-Usage: $PROG <bootstrap|migrate|status> <service>
+Usage: $PROG <migrate|status> <service>
 
-  bootstrap <svc>           Create database, app/migrator users, grant privileges.
-                            SUPERUSER_DSN for a remote DB; unset = local peer auth
-                            as the postgres OS user (same-host PostgreSQL).
-  migrate   <svc>           Apply outstanding migrations via the service binary
-                            (\`<binary> migrate\`, as the migrator user).
-  status    <svc>           Show installed schema_migrations version vs shipped
-                            SCHEMA_VERSION (forward-only; no rollback).
+  migrate <svc>   Apply outstanding migrations via the service binary
+                  (\`<binary> migrate\`, connecting as the service role).
+  status  <svc>   Show installed schema_migrations version vs shipped
+                  SCHEMA_VERSION (forward-only; no rollback).
 
+Database/role creation is handled by duynhlab-bootstrap, not this command.
 Service env file: \$ETC_BASE/<svc>.env (default $ETC_BASE)
 EOF
   exit 2
@@ -64,14 +63,9 @@ set -a; . "$ENV_FILE"; set +a
 
 [[ -n "$DB_PASSWORD" ]] || die "DB_PASSWORD is empty in $ENV_FILE"
 
-APP_USER=${DB_USER}
-MIGRATOR_USER=${DB_MIGRATOR_USER:-${DB_USER}_migrator}
-MIGRATOR_PASSWORD=${DB_MIGRATOR_PASSWORD:-$DB_PASSWORD}
-
 build_dsn() {
-  local user=$1 pass=$2
   printf "postgresql://%s:%s@%s:%s/%s?sslmode=%s" \
-    "$user" "$pass" "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_SSLMODE"
+    "$DB_USER" "$DB_PASSWORD" "$DB_HOST" "$DB_PORT" "$DB_NAME" "$DB_SSLMODE"
 }
 
 require_psql() { command -v psql >/dev/null 2>&1 || die "psql not found (install postgresql client)"; }
@@ -85,57 +79,19 @@ service_binary() {
 }
 
 case "$CMD" in
-  bootstrap)
-    require_psql
-    # Superuser step: explicit SUPERUSER_DSN (remote/managed DB), or — when unset
-    # — local peer auth as the postgres OS user for a same-host PostgreSQL.
-    if [[ -n "${SUPERUSER_DSN:-}" ]]; then
-      su_psql=(psql "$SUPERUSER_DSN")
-      info "Bootstrapping database $DB_NAME on $DB_HOST:$DB_PORT (SUPERUSER_DSN)"
-    else
-      command -v runuser >/dev/null 2>&1 \
-        || die "SUPERUSER_DSN unset and runuser not found (need it for local peer auth)"
-      su_psql=(runuser -u postgres -- psql)
-      info "Bootstrapping database $DB_NAME via local peer auth (postgres OS user)"
-    fi
-    "${su_psql[@]}" -v ON_ERROR_STOP=1 <<SQL
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$APP_USER') THEN
-    CREATE ROLE "$APP_USER" LOGIN PASSWORD '$DB_PASSWORD';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$MIGRATOR_USER') THEN
-    CREATE ROLE "$MIGRATOR_USER" LOGIN PASSWORD '$MIGRATOR_PASSWORD';
-  END IF;
-END
-\$\$;
-SELECT 'CREATE DATABASE "$DB_NAME" OWNER "$MIGRATOR_USER"'
- WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
-GRANT CONNECT ON DATABASE "$DB_NAME" TO "$APP_USER";
-SQL
-    psql "$(build_dsn "$MIGRATOR_USER" "$MIGRATOR_PASSWORD")" -v ON_ERROR_STOP=1 <<SQL
-GRANT USAGE ON SCHEMA public TO "$APP_USER";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "$APP_USER";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO "$APP_USER";
-SQL
-    info "Bootstrap OK (db=$DB_NAME, app=$APP_USER, migrator=$MIGRATOR_USER)"
-    ;;
-
   migrate)
     BIN=$(service_binary)
-    info "Applying embedded migrations: $BIN migrate (as $MIGRATOR_USER, direct host $DB_HOST)"
-    # The binary builds its DSN from DB_* env. Run as the migrator role against the
-    # DIRECT host (DDL via a pooler is unsafe — migratex forbids it). DB_HOST in the
-    # env file points at the real Postgres on bare-metal, so no pooler is involved.
-    DB_USER="$MIGRATOR_USER" DB_PASSWORD="$MIGRATOR_PASSWORD" "$BIN" migrate
+    info "Applying embedded migrations: $BIN migrate (as $DB_USER, direct host $DB_HOST)"
+    # The binary builds its DSN from DB_* env and connects as the service role
+    # (which owns the database). Run against the DIRECT host — DDL via a pooler is
+    # unsafe (migratex forbids it); on the RPM DB_HOST is the local Postgres.
+    "$BIN" migrate
     info "Migrations applied"
     ;;
 
   status)
     require_psql
-    DSN=$(build_dsn "$MIGRATOR_USER" "$MIGRATOR_PASSWORD")
+    DSN=$(build_dsn)
     SHIPPED=$(cat "$SCHEMA_VERSION_FILE" 2>/dev/null || echo "unknown")
     # golang-migrate tracks state in the unqualified `schema_migrations` table.
     INSTALLED=$(psql "$DSN" -tAc \

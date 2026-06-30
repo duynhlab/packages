@@ -177,7 +177,7 @@ intact. To purge those:
 ```bash
 sudo rm -rf /etc/duynhlab /var/log/duynhlab /var/lib/duynhlab
 # And, only if you know what you're doing:
-sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;" ...
+sudo -u postgres psql -c "DROP DATABASE auth;" ...
 ```
 
 ## Troubleshooting

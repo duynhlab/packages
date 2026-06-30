@@ -56,14 +56,14 @@ pick_runner() {
 _SVC_ORDER=(auth user product cart order review notification shipping frontend)
 
 declare -A _SVC=(
-  [auth|repo]=duynhlab/auth-service  [auth|src_dir]=auth-service  [auth|binary]=auth-service  [auth|build_path]=./cmd  [auth|port]=8001  [auth|grpc_port]=9001  [auth|type]=backend  [auth|database.name]=duynhlab_auth  [auth|database.app_user]=duynhlab_auth_app  [auth|database.migrator_user]=duynhlab_auth_migrator
-  [user|repo]=duynhlab/user-service  [user|src_dir]=user-service  [user|binary]=user-service  [user|build_path]=./cmd  [user|port]=8002  [user|type]=backend  [user|database.name]=duynhlab_user  [user|database.app_user]=duynhlab_user_app  [user|database.migrator_user]=duynhlab_user_migrator
-  [product|repo]=duynhlab/product-service  [product|src_dir]=product-service  [product|binary]=product-service  [product|build_path]=./cmd  [product|port]=8003  [product|type]=backend  [product|database.name]=duynhlab_product  [product|database.app_user]=duynhlab_product_app  [product|database.migrator_user]=duynhlab_product_migrator
-  [cart|repo]=duynhlab/cart-service  [cart|src_dir]=cart-service  [cart|binary]=cart-service  [cart|build_path]=./cmd  [cart|port]=8004  [cart|type]=backend  [cart|database.name]=duynhlab_cart  [cart|database.app_user]=duynhlab_cart_app  [cart|database.migrator_user]=duynhlab_cart_migrator
-  [order|repo]=duynhlab/order-service  [order|src_dir]=order-service  [order|binary]=order-service  [order|build_path]=./cmd  [order|port]=8005  [order|type]=backend  [order|database.name]=duynhlab_order  [order|database.app_user]=duynhlab_order_app  [order|database.migrator_user]=duynhlab_order_migrator
-  [review|repo]=duynhlab/review-service  [review|src_dir]=review-service  [review|binary]=review-service  [review|build_path]=./cmd  [review|port]=8006  [review|grpc_port]=9006  [review|type]=backend  [review|database.name]=duynhlab_review  [review|database.app_user]=duynhlab_review_app  [review|database.migrator_user]=duynhlab_review_migrator
-  [notification|repo]=duynhlab/notification-service  [notification|src_dir]=notification-service  [notification|binary]=notification-service  [notification|build_path]=./cmd  [notification|port]=8007  [notification|grpc_port]=9007  [notification|type]=backend  [notification|database.name]=duynhlab_notification  [notification|database.app_user]=duynhlab_notification_app  [notification|database.migrator_user]=duynhlab_notification_migrator
-  [shipping|repo]=duynhlab/shipping-service  [shipping|src_dir]=shipping-service  [shipping|binary]=shipping-service  [shipping|build_path]=./cmd  [shipping|port]=8008  [shipping|grpc_port]=9008  [shipping|type]=backend  [shipping|database.name]=duynhlab_shipping  [shipping|database.app_user]=duynhlab_shipping_app  [shipping|database.migrator_user]=duynhlab_shipping_migrator
+  [auth|repo]=duynhlab/auth-service  [auth|src_dir]=auth-service  [auth|binary]=auth-service  [auth|build_path]=./cmd  [auth|port]=8001  [auth|grpc_port]=9001  [auth|type]=backend  [auth|database.name]=auth  [auth|database.user]=auth
+  [user|repo]=duynhlab/user-service  [user|src_dir]=user-service  [user|binary]=user-service  [user|build_path]=./cmd  [user|port]=8002  [user|type]=backend  [user|database.name]=user  [user|database.user]=user
+  [product|repo]=duynhlab/product-service  [product|src_dir]=product-service  [product|binary]=product-service  [product|build_path]=./cmd  [product|port]=8003  [product|type]=backend  [product|database.name]=product  [product|database.user]=product
+  [cart|repo]=duynhlab/cart-service  [cart|src_dir]=cart-service  [cart|binary]=cart-service  [cart|build_path]=./cmd  [cart|port]=8004  [cart|type]=backend  [cart|database.name]=cart  [cart|database.user]=cart
+  [order|repo]=duynhlab/order-service  [order|src_dir]=order-service  [order|binary]=order-service  [order|build_path]=./cmd  [order|port]=8005  [order|type]=backend  [order|database.name]=order  [order|database.user]=order
+  [review|repo]=duynhlab/review-service  [review|src_dir]=review-service  [review|binary]=review-service  [review|build_path]=./cmd  [review|port]=8006  [review|grpc_port]=9006  [review|type]=backend  [review|database.name]=review  [review|database.user]=review
+  [notification|repo]=duynhlab/notification-service  [notification|src_dir]=notification-service  [notification|binary]=notification-service  [notification|build_path]=./cmd  [notification|port]=8007  [notification|grpc_port]=9007  [notification|type]=backend  [notification|database.name]=notification  [notification|database.user]=notification
+  [shipping|repo]=duynhlab/shipping-service  [shipping|src_dir]=shipping-service  [shipping|binary]=shipping-service  [shipping|build_path]=./cmd  [shipping|port]=8008  [shipping|grpc_port]=9008  [shipping|type]=backend  [shipping|database.name]=shipping  [shipping|database.user]=shipping
   [frontend|repo]=duynhlab/frontend  [frontend|src_dir]=frontend  [frontend|binary]=  [frontend|build_path]=  [frontend|port]=8080  [frontend|type]=static
 )
 
@@ -86,7 +86,7 @@ svc_list() { printf '%s\n' "${_SVC_ORDER[@]}"; }
 
 # svc_field <name> <field-path>
 #   svc_field auth repo            -> duynhlab/auth-service
-#   svc_field auth database.name   -> duynhlab_auth
+#   svc_field auth database.name   -> auth
 svc_field() {
   local name=$1 field=$2
   printf '%s\n' "${_SVC[$name|$field]:-}"
