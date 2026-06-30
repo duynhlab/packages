@@ -54,14 +54,14 @@ would collide on a shared host, so each gets its own).
 
 | Service | HTTP | gRPC | Database |
 |---|:---:|:---:|---|
-| `auth` | 8001 | 9001 | `duynhlab_auth` |
-| `user` | 8002 | — | `duynhlab_user` |
-| `product` | 8003 | — | `duynhlab_product` |
-| `cart` | 8004 | — | `duynhlab_cart` |
-| `order` | 8005 | — | `duynhlab_order` |
-| `review` | 8006 | 9006 | `duynhlab_review` |
-| `notification` | 8007 | 9007 | `duynhlab_notification` |
-| `shipping` | 8008 | 9008 | `duynhlab_shipping` |
+| `auth` | 8001 | 9001 | `auth` |
+| `user` | 8002 | — | `user` |
+| `product` | 8003 | — | `product` |
+| `cart` | 8004 | — | `cart` |
+| `order` | 8005 | — | `order` |
+| `review` | 8006 | 9006 | `review` |
+| `notification` | 8007 | 9007 | `notification` |
+| `shipping` | 8008 | 9008 | `shipping` |
 | `frontend` | 8080 | — | _(static SPA)_ |
 
 ## Quick start

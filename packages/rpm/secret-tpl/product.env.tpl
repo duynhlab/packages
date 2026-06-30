@@ -5,11 +5,8 @@ PORT=8003
 
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=duynhlab_product
-DB_USER=duynhlab_product_app
+DB_NAME=product
+DB_USER=product
 DB_PASSWORD=__DB_PASSWORD__
 DB_SSLMODE=disable
 DB_POOL_MAX_CONNECTIONS=25
-
-DB_MIGRATOR_USER=duynhlab_product_app_migrator
-DB_MIGRATOR_PASSWORD=__DB_PASSWORD__

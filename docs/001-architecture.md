@@ -49,14 +49,14 @@ flowchart TB
 
 | Service | Port | DB | Extra `After=` |
 |---|---|---|---|
-| auth | 8001 | `duynhlab_auth` | — |
-| user | 8002 | `duynhlab_user` | — |
-| product | 8003 | `duynhlab_product` | — |
-| cart | 8004 | `duynhlab_cart` | — |
-| order | 8005 | `duynhlab_order` | — |
-| review | 8006 | `duynhlab_review` | — |
-| notification | 8007 | `duynhlab_notification` | — |
-| shipping | 8008 | `duynhlab_shipping` | — |
+| auth | 8001 | `auth` | — |
+| user | 8002 | `user` | — |
+| product | 8003 | `product` | — |
+| cart | 8004 | `cart` | — |
+| order | 8005 | `order` | — |
+| review | 8006 | `review` | — |
+| notification | 8007 | `notification` | — |
+| shipping | 8008 | `shipping` | — |
 | frontend | — | — | static, served by nginx |
 
 > The hardcoded registry in `scripts/lib/common.sh` is the single source of

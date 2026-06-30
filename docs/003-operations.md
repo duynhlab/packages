@@ -159,7 +159,7 @@ dnf remove -y duynhlab
 ```bash
 rm -rf /etc/duynhlab /var/log/duynhlab /var/lib/duynhlab
 # and, deliberately:
-sudo -u postgres psql -c "DROP DATABASE duynhlab_auth;"   # … per service
+sudo -u postgres psql -c "DROP DATABASE auth;"   # … per service
 ```
 
 ## 8. Troubleshooting

@@ -6,11 +6,8 @@ GRPC_PORT=9001
 
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=duynhlab_auth
-DB_USER=duynhlab_auth_app
+DB_NAME=auth
+DB_USER=auth
 DB_PASSWORD=__DB_PASSWORD__
 DB_SSLMODE=disable
 DB_POOL_MAX_CONNECTIONS=25
-
-DB_MIGRATOR_USER=duynhlab_auth_app_migrator
-DB_MIGRATOR_PASSWORD=__DB_PASSWORD__

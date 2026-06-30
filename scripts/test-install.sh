@@ -78,7 +78,8 @@ test -d /opt/duynhlab/secret-tpl
 test -f /opt/duynhlab/nginx/duynhlab.conf
 test -f /opt/duynhlab/valkey/duynhlab.conf
 test -f /opt/duynhlab/postgresql/duynhlab-tuning.conf
-test -f /opt/duynhlab/postgresql/bootstrap.sql
+test -f /opt/duynhlab/postgresql/init-users.sql
+test -f /opt/duynhlab/postgresql/init-databases.sql
 test -f /opt/duynhlab/logrotate/duynhlab-services
 test -f /opt/duynhlab/logrotate/duynhlab-nginx
 test -x /opt/duynhlab/lib/init-service.sh

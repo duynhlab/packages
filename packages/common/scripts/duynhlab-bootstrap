@@ -1,28 +1,47 @@
 #!/usr/bin/env bash
 # duynhlab-bootstrap — one-time, idempotent DB bootstrap + migrate for every
 # backend. Invoked by duynhlab-bootstrap.service before the platform starts; not
-# a user CLI (no /usr/bin symlink). Safe to re-run: `duynhdb bootstrap` is all
-# IF NOT EXISTS and `migrate` is forward-only (no-op when up to date).
+# a user CLI (no /usr/bin symlink). Safe to re-run on install/upgrade/restart:
+# the SQL is all idempotent and `migrate` is forward-only (no-op when current).
+#
+# As the postgres superuser it applies two declarative SQL files shipped in the
+# RPM (see /opt/duynhlab/postgresql/):
+#   1. init-users.sql      — once per service: create/refresh the service's login
+#                            role (role name = service, password from its env).
+#   2. init-databases.sql  — once: one database per service, owned by its role.
+# Then it runs each service binary's embedded migrations.
 #
 # DB superuser access:
 #   - SUPERUSER_DSN set (via /etc/duynhlab/bootstrap.env) → remote/explicit DB.
 #   - unset                                               → local peer auth as
-#     the postgres OS user (same-host PostgreSQL). See duynhdb.
+#     the postgres OS user (same-host PostgreSQL).
 set -euo pipefail
 
 ETC_BASE=${ETC_BASE:-/etc/duynhlab}
+OPT_BASE=${OPT_BASE:-/opt/duynhlab}
 DUYNHDB=${DUYNHDB:-/usr/bin/duynhdb}
+SQL_DIR="$OPT_BASE/postgresql"
 BACKENDS=(auth user product cart order review notification shipping)
 
 log() { printf '[duynhlab-bootstrap] %s\n' "$*"; }
+die() { log "error: $*"; exit 1; }
 
 # bootstrap.env may export SUPERUSER_DSN for a remote DB; absent = local peer.
 # shellcheck disable=SC1091
 [ -f "$ETC_BASE/bootstrap.env" ] && . "$ETC_BASE/bootstrap.env"
 export SUPERUSER_DSN="${SUPERUSER_DSN:-}"
 
+# Superuser psql: explicit SUPERUSER_DSN (remote/managed), or local peer auth as
+# the postgres OS user for a same-host PostgreSQL.
+if [ -n "$SUPERUSER_DSN" ]; then
+  su_psql() { psql "$SUPERUSER_DSN" "$@"; }
+else
+  command -v runuser >/dev/null 2>&1 \
+    || die "SUPERUSER_DSN unset and runuser not found (need it for local peer auth)"
+  su_psql() { runuser -u postgres -- psql "$@"; }
+fi
+
 # ── Wait for PostgreSQL to accept connections ────────────────────────────────
-# pg_isready against the explicit DSN (remote) or the local socket (peer).
 ready=
 for i in $(seq 1 60); do
   if [ -n "$SUPERUSER_DSN" ]; then
@@ -35,16 +54,29 @@ for i in $(seq 1 60); do
 done
 if [ -z "$ready" ]; then
   log "PostgreSQL never became ready."
-  if [ -z "$SUPERUSER_DSN" ]; then
-    log "No local PostgreSQL and no SUPERUSER_DSN — set it in $ETC_BASE/bootstrap.env for a remote DB."
-  fi
+  [ -z "$SUPERUSER_DSN" ] && log "No local PostgreSQL and no SUPERUSER_DSN — set it in $ETC_BASE/bootstrap.env for a remote DB."
   exit 1
 fi
 
-# ── Bootstrap + migrate every backend (idempotent) ───────────────────────────
+# ── 1. Roles: one login role per service (password from its env file) ────────
 for svc in "${BACKENDS[@]}"; do
-  log "bootstrap $svc"
-  "$DUYNHDB" bootstrap "$svc"
+  envf="$ETC_BASE/$svc.env"
+  [ -f "$envf" ] || die "Env file missing: $envf (run password-generator.sh first)"
+  # Read role + password without leaking into this shell's environment.
+  role=$(. "$envf"; printf '%s' "${DB_USER:-}")
+  pass=$(. "$envf"; printf '%s' "${DB_PASSWORD:-}")
+  [ -n "$role" ] || die "DB_USER empty in $envf"
+  [ -n "$pass" ] || die "DB_PASSWORD empty in $envf"
+  log "role $svc"
+  su_psql -v ON_ERROR_STOP=1 -v role="$role" -v pass="$pass" -f "$SQL_DIR/init-users.sql"
+done
+
+# ── 2. Databases: one per service, owned by its role (idempotent) ────────────
+log "databases"
+su_psql -v ON_ERROR_STOP=1 -f "$SQL_DIR/init-databases.sql"
+
+# ── 3. Migrate every backend (forward-only, idempotent) ──────────────────────
+for svc in "${BACKENDS[@]}"; do
   log "migrate $svc"
   "$DUYNHDB" migrate "$svc"
 done

@@ -33,7 +33,7 @@ associative array (mirror an existing backend such as `auth`):
 _SVC_ORDER=(auth user product cart order review notification shipping payments frontend)
 
 # …inside the _SVC=( … ) block (one logical row per service):
-  [payments|repo]=duynhlab/payments-service  [payments|src_dir]=payments-service  [payments|binary]=payments-service  [payments|build_path]=./cmd  [payments|port]=8009  [payments|type]=backend  [payments|database.name]=duynhlab_payments  [payments|database.app_user]=duynhlab_payments_app  [payments|database.migrator_user]=duynhlab_payments_migrator
+  [payments|repo]=duynhlab/payments-service  [payments|src_dir]=payments-service  [payments|binary]=payments-service  [payments|build_path]=./cmd  [payments|port]=8009  [payments|type]=backend  [payments|database.name]=payments  [payments|database.user]=payments
   # add [payments|grpc_port]=9009 only if it runs a gRPC server
 ```
 
@@ -56,9 +56,9 @@ still need the §3 touch points.
 | 6 | `packages/rpm/duynhlab.spec` | `%files` payload dirs (~219) | `%{duynhlab_prefix}/payments` |
 | 7 | `packages/rpm/duynhlab.spec` | `%files` ghost env list (~262) | `%ghost %attr(0640, root, %{duynhlab_group}) %{duynhlab_etc}/payments.env` |
 | 8 | `packages/rpm/lib/init-service.sh` | `BACKENDS` array (~19) | `payments` |
-| 9 | `packages/rpm/secret-tpl/payments.env.tpl` | **new file** | copy `auth.env.tpl`, set `SERVICE_NAME`/`PORT=8009`/(`GRPC_PORT`)/`DB_NAME=duynhlab_payments`/`DB_USER=duynhlab_payments_app`/migrator names; keep `__DB_PASSWORD__` placeholders |
+| 9 | `packages/rpm/secret-tpl/payments.env.tpl` | **new file** | copy `auth.env.tpl`, set `SERVICE_NAME`/`PORT=8009`/(`GRPC_PORT`)/`DB_NAME=payments`/`DB_USER=payments`/migrator names; keep `__DB_PASSWORD__` placeholders |
 | 10 | `scripts/test-install.sh` | binary-check loop (~62), `expected_services` (~107), env-file loop (~122), log-dir loop (~148) | `payments` in all four |
-| 11 | `packages/rpm/nginx/duynhlab.conf` | upstream block (~15) + per-service location(s) | `upstream duynhlab_payments { server 127.0.0.1:8009; }` and one pass-through `location` per exposed audience, e.g. `location /payments/v1/public/ { proxy_pass http://duynhlab_payments; }` (no trailing slash; `internal` is blocked globally) |
+| 11 | `packages/rpm/nginx/duynhlab.conf` | upstream block (~15) + per-service location(s) | `upstream payments { server 127.0.0.1:8009; }` and one pass-through `location` per exposed audience, e.g. `location /payments/v1/public/ { proxy_pass http://payments; }` (no trailing slash; `internal` is blocked globally) |
 
 Grep guard before committing — every hardcoded list should now contain the new
 name:
