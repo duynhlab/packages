@@ -9,8 +9,7 @@
 #   - cd $DUYNHLAB_SRC_ROOT/<src_dir>
 #   - git fetch && checkout main && pull --ff-only (unless DUYNHLAB_NO_GIT=1)
 #   - go build (CGO=0, GOOS=linux GOARCH=amd64) -> build/<svc>/raw/payload/bin/<binary>
-#   - Migrations are embedded in the binary (//go:embed) — NOT staged (D24). The
-#     highest migration version is recorded in build-info.env as SCHEMA_VERSION (audit).
+#   - Migrations are embedded in the binary (//go:embed) — NOT staged (D24).
 #   - Frontend (type=static): bake build.env (VITE_*) then npm ci && npm run build
 #     -> build/<svc>/raw/payload/dist/
 
@@ -109,16 +108,6 @@ case "$TYPE" in
     log_ok "Binary payload: ${PAYLOAD#$REPO_ROOT/}/bin/$BINARY ($(du -sh "$PAYLOAD" | cut -f1))"
 
     # Migrations are embedded in the binary (//go:embed); we do NOT ship loose SQL.
-    # Record the highest migration version for audit (SCHEMA_VERSION in build-info.env).
-    MIG_SRC="$SRC_PATH/db/migrations/sql"
-    if [[ -d "$MIG_SRC" ]] && compgen -G "$MIG_SRC/*.up.sql" >/dev/null; then
-      SCHEMA_VERSION=$(for f in "$MIG_SRC"/*.up.sql; do basename "$f" | cut -d_ -f1; done \
-        | sed 's/^0*//' | sort -n | tail -1)
-      SCHEMA_VERSION=${SCHEMA_VERSION:-0}
-      log_ok "Migrations:     embedded in binary, max version=$SCHEMA_VERSION ($(ls "$MIG_SRC"/*.up.sql | wc -l) up-files)"
-    else
-      log_warn "No migrations dir ($MIG_SRC) — SCHEMA_VERSION unset"
-    fi
     ;;
 
   static)
@@ -151,18 +140,8 @@ case "$TYPE" in
     ;;
 esac
 
-# ── Metadata sidecar (consumed by build-rpm.sh later) ────────────────────────
-cat > "$RAW_DIR/build-info.env" <<EOF
-SERVICE=$SERVICE
-TYPE=$TYPE
-VERSION=$VERSION
-GIT_SHA=$GIT_SHA
-GOOS=$GOOS
-GOARCH=$GOARCH
-SCHEMA_VERSION=${SCHEMA_VERSION:-}
-BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-SOURCE=local
-EOF
+# ── Version sidecar (consumed by stage-all.sh) ───────────────────────────────
+printf '%s\n' "$VERSION" > "$RAW_DIR/VERSION"
 
 log_ok "Done. Artifacts in: ${RAW_DIR#$REPO_ROOT/}"
 ls -1 "$RAW_DIR" | sed 's/^/  - /' >&2

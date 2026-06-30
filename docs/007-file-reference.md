@@ -46,8 +46,7 @@ with migrations embedded (`<binary> migrate`).
 | frontend | `/opt/duynhlab/frontend/dist/` (static SPA, served by nginx) | 8080 (vhost) | — | — | — |
 
 Per-service audit files next to each binary (`/opt/duynhlab/<svc>/`):
-`BINARY_VERSION` (built version), `SCHEMA_VERSION` (highest embedded migration
-— informational only, nothing blocks startup), `README.md`. The exact source
+`BINARY_VERSION` (built version), `README.md`. The exact source
 commits of all 9 components are in `/opt/duynhlab/etc/manifest`.
 
 ## 3. Rest of the payload under `/opt/duynhlab`

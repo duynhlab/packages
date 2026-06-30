@@ -5,7 +5,7 @@
 #   migrate <svc>   Run pending migrations by exec'ing the service binary's own
 #                   `migrate` subcommand (golang-migrate embedded via pkg/migratex),
 #                   connecting as the service's role.
-#   status  <svc>   Print installed schema_migrations version vs shipped SCHEMA_VERSION.
+#   status  <svc>   Print the installed schema_migrations version.
 #
 # Database + role creation is done by duynhlab-bootstrap (the postgres superuser
 # applies postgresql/init-users.sql + init-databases.sql) — not here. One role per
@@ -33,8 +33,7 @@ Usage: $PROG <migrate|status> <service>
 
   migrate <svc>   Apply outstanding migrations via the service binary
                   (\`<binary> migrate\`, connecting as the service role).
-  status  <svc>   Show installed schema_migrations version vs shipped
-                  SCHEMA_VERSION (forward-only; no rollback).
+  status  <svc>   Show the installed schema_migrations version.
 
 Database/role creation is handled by duynhlab-bootstrap, not this command.
 Service env file: \$ETC_BASE/<svc>.env (default $ETC_BASE)
@@ -47,7 +46,6 @@ CMD=$1; SVC=$2; shift 2 || true
 
 ENV_FILE="$ETC_BASE/$SVC.env"
 BIN_DIR="$OPT_BASE/$SVC/bin"
-SCHEMA_VERSION_FILE="$OPT_BASE/$SVC/SCHEMA_VERSION"
 
 [[ -f "$ENV_FILE" ]] || die "Env file missing: $ENV_FILE"
 
@@ -92,14 +90,12 @@ case "$CMD" in
   status)
     require_psql
     DSN=$(build_dsn)
-    SHIPPED=$(cat "$SCHEMA_VERSION_FILE" 2>/dev/null || echo "unknown")
     # golang-migrate tracks state in the unqualified `schema_migrations` table.
     INSTALLED=$(psql "$DSN" -tAc \
       "SELECT version || (CASE WHEN dirty THEN ' (DIRTY)' ELSE '' END) FROM schema_migrations" \
       2>/dev/null || echo "none")
     [[ -n "$INSTALLED" ]] || INSTALLED="none"
     echo "service:       $SVC"
-    echo "shipped:       $SHIPPED   (max embedded migration, audit-only)"
     echo "installed:     $INSTALLED"
     ;;
 

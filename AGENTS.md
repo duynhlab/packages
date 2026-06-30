@@ -96,10 +96,9 @@ Three stages, all driven by the hardcoded registry in `scripts/lib/common.sh`:
 
 1. **`build-local.sh <svc>`** — `cd $DUYNHLAB_SRC_ROOT/<src_dir>`, `go build` (backend,
    `CGO_ENABLED=0 GOOS=linux GOARCH=amd64`) or `npm ci && npm run build` (frontend, with `build.env`
-   such as `VITE_API_BASE_URL` baked in). Output: `build/<svc>/raw/<binary>-<ver>-linux-amd64.tar.gz`
-   + `build-info.env` (carries `SCHEMA_VERSION` = highest embedded migration, audit-only).
+   such as `VITE_API_BASE_URL` baked in). Output: `build/<svc>/raw/payload/` + `VERSION`.
 2. **`stage-all.sh`** — extract every backend tarball + frontend dist into
-   `build/staging/opt/duynhlab/`, write `BINARY_VERSION`/`SCHEMA_VERSION`, copy CLI tools + config
+   `build/staging/opt/duynhlab/`, write `BINARY_VERSION`, copy CLI tools + config
    templates, generate the **composition manifest** (`etc/manifest` — the 9 service SHAs, used by
    release notes and shipped in the RPM), run `render-systemd.sh`, then tar everything as the
    Source0 staging tarball.
@@ -131,7 +130,7 @@ come pre-built from the service repos.
 
 `build/` and `dist/` are **generated and gitignored — never hand-edit and never commit**:
 
-- `build/<svc>/raw/` — per-service tarballs + `build-info.env`
+- `build/<svc>/raw/` — per-service extracted payload + `VERSION`
 - `build/staging/` — the assembled FHS tree
 - `build/systemd/` — rendered `.service`/`.target` files (regenerate via `render-systemd.sh`)
 - `build/sources/duynhlab-<ver>-staging.tar.gz` — the SPEC's `Source0`

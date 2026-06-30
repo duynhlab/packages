@@ -23,9 +23,9 @@ Key invariants:
 - **Published == tested** — build, test, and publish happen in one run on one artifact.
 - The RPM's `Version:` always equals the tag (`v2026.06.11` → `duynhlab-2026.06.11-1.el9`).
 - **Backends are composed from their published release binaries** (`source=release`
-  → `fetch-releases.sh`, pinned in [`services.lock`](../services.lock),
-  checksum-verified), not recompiled. The frontend is built from source. So a
-  release ships exactly the service versions pinned in `services.lock`.
+  → `fetch-releases.sh`, latest release per service, checksum-verified against
+  `checksums.txt`), not recompiled. The frontend is built from source. So a
+  release ships each backend's latest published version.
 
 ## 2. Cut a release
 
@@ -46,20 +46,12 @@ When the run is green: the Release page has the RPM + `MANIFEST.txt`, and
 `https://duynhlab.github.io/packages` serves metadata indexing the last 3
 releases.
 
-### Bump a service version in the RPM
+### Change which service version ships
 
-The released RPM ships the service versions pinned in
-[`services.lock`](../services.lock) (`<svc>=<tag>`, e.g. `auth=v1.0.0`). To pull a
-newer (or older) service release into the next mega-RPM, edit its pin and cut a
-release:
-
-```bash
-# e.g. take auth-service v1.1.0 into the next platform release
-sed -i 's/^auth=.*/auth=v1.1.0/' services.lock
-git add services.lock && git commit -m "Bump auth-service to v1.1.0"
-# open a PR; after merge:
-make release
-```
+Each release automatically pulls **each backend's latest published release**
+(`fetch-releases.sh` resolves the newest non-draft tag per repo). To change what
+ships in the next mega-RPM, cut a new release in the service repo, then
+`make release` here. There is no pin file to edit.
 
 A service with no line (or `=latest`) tracks its newest non-draft release.
 Validate the release path before cutting with
@@ -107,8 +99,8 @@ Older than that: download from the
 
 > ⚠️ Migrations are **forward-only** — downgrading the package does not
 > downgrade the schema. Only downgrade across versions with the same
-> `SCHEMA_VERSION` (check the release notes / manifest), or restore the DB from
-> a pre-upgrade backup. See [`002-install.md`](002-install.md) § Downgrade.
+> a compatible schema, or restore the DB from a pre-upgrade backup. See
+> [`002-install.md`](002-install.md) § Downgrade.
 
 ## 6. Audit a release
 

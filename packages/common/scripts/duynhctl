@@ -103,10 +103,9 @@ cmd_health() {
 
 cmd_version() {
   for svc in $(resolve_targets "$1"); do
-    local bin sch
+    local bin
     bin=$(cat "$OPT_BASE/$svc/BINARY_VERSION" 2>/dev/null || echo "unknown")
-    sch=$(cat "$OPT_BASE/$svc/SCHEMA_VERSION" 2>/dev/null || echo "n/a")
-    printf "%-15s binary=%-25s schema=%s\n" "$svc" "$bin" "$sch"
+    printf "%-15s binary=%s\n" "$svc" "$bin"
   done
 }
 
