@@ -139,8 +139,7 @@ Upgrades:
 - **Preserve** `/etc/duynhlab/*.env` and the database.
 - **Do not auto-migrate.** Always run `duynhdb migrate <svc>` after an
   upgrade — a new binary may query tables/columns its embedded migrations have
-  not created yet, failing at runtime with SQL errors. (`SCHEMA_VERSION` under
-  `/opt/duynhlab/<svc>/` is audit metadata only — nothing blocks startup.)
+  not created yet, failing at runtime with SQL errors.
 
 ### Downgrade / pin a version
 
@@ -154,9 +153,8 @@ sudo dnf install -y duynhlab-2026.06.09  # or pin an exact version
 ```
 
 > ⚠️ Downgrading the package does **not** downgrade the database schema —
-> migrations are forward-only. Only downgrade across versions whose
-> `SCHEMA_VERSION` matches (check the release notes), or restore the DB from a
-> backup taken before the upgrade.
+> migrations are forward-only. Only downgrade when the schema is compatible, or
+> restore the DB from a backup taken before the upgrade.
 
 Releases older than the last 3: download the RPM from
 [GitHub Releases](https://github.com/duynhlab/packages/releases) and

@@ -44,9 +44,8 @@ duynhdb <bootstrap|migrate|status> <svc>
 
 | Subcommand | Needs | Description |
 |---|---|---|
-| `bootstrap <svc>` | `SUPERUSER_DSN` | Create database + `app`/`migrator` roles + grants |
-| `migrate <svc>` | — | Apply pending migrations by exec'ing the service binary's own `migrate` subcommand (embedded golang-migrate) as the migrator role |
-| `status <svc>` | — | Installed `schema_migrations` version (+ dirty flag) vs shipped `SCHEMA_VERSION` |
+| `migrate <svc>` | — | Apply pending migrations by exec'ing the service binary's own `migrate` subcommand (embedded golang-migrate) as the service role |
+| `status <svc>` | — | Installed `schema_migrations` version (+ dirty flag) |
 
 > Migrations are **forward-only** and embedded in each service binary — there is no
 > `rollback`. Roll forward with a new migration in the service repo.
@@ -143,8 +142,8 @@ dnf upgrade -y duynhlab
 That's it: the `%post` scriptlet re-runs `duynhlab-bootstrap.service`, which
 applies any new migrations **before** the backends are restarted. Upgrades
 preserve `/etc/duynhlab/*.env` and the database. (Migrations are auto-applied in
-the right order; `SCHEMA_VERSION` is audit metadata only. To check or re-run by
-hand: `duynhdb status <svc>` / `systemctl restart duynhlab-bootstrap.service`.)
+the right order. To check or re-run by hand: `duynhdb status <svc>` /
+`systemctl restart duynhlab-bootstrap.service`.)
 
 ## 7. Remove
 

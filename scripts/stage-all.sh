@@ -2,7 +2,7 @@
 # scripts/stage-all.sh — produce the Source0 tarball for the mega-RPM.
 #
 # Layout produced at $BUILD_DIR/staging/:
-#   opt/duynhlab/<svc>/{bin,BINARY_VERSION,SCHEMA_VERSION}
+#   opt/duynhlab/<svc>/{bin,BINARY_VERSION}
 #   (migrations are embedded in the service binary — no loose SQL is staged; D24)
 #   opt/duynhlab/frontend/dist/...
 #   opt/duynhlab/etc/{env-global.properties, manifest}
@@ -21,9 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 
 VERSION="${VERSION:-$(date -u +%Y.%m.%d)}"
-# extract_backend sources each build-info.env, which also defines VERSION —
-# capture the platform version up front so later sections don't see the clobber.
-PLATFORM_VERSION="$VERSION"
+PLATFORM_VERSION="$VERSION"  # whole-platform (RPM) version, distinct from per-service
 STAGE="$BUILD_DIR/staging"
 OPT="$STAGE/opt/duynhlab"
 SYSD="$STAGE/systemd"
@@ -41,22 +39,17 @@ mkdir -p "$OPT"/{etc,lib,nginx,valkey,postgresql,secret-tpl,logrotate}
 # ── 1. Per-service backends ───────────────────────────────────────────────────
 extract_backend() {
   local svc=$1 raw_dir="$BUILD_DIR/$svc/raw"
-  local payload="$raw_dir/payload" info="$raw_dir/build-info.env"
+  local payload="$raw_dir/payload" verf="$raw_dir/VERSION"
 
   [[ -d "$payload" ]] || die "Missing build/$svc/raw/payload — run scripts/build-local.sh or fetch-releases.sh"
-  [[ -f "$info"    ]] || die "Missing build-info.env for $svc"
+  [[ -f "$verf"    ]] || die "Missing VERSION for $svc"
 
   local dst="$OPT/$svc"
   mkdir -p "$dst"
   cp -a "$payload/." "$dst/"
 
-  # SCHEMA_VERSION (audit-only): highest embedded migration, recorded by
-  # build-local.sh into build-info.env. Migrations themselves ship inside the
-  # binary (//go:embed) — none are staged here.
-  # shellcheck disable=SC1090
-  . "$info"
-  printf '%s\n' "${VERSION:-unknown}"   > "$dst/BINARY_VERSION"
-  printf '%s\n' "${SCHEMA_VERSION:-1}"  > "$dst/SCHEMA_VERSION"
+  # Migrations are embedded in the service binary (//go:embed) — none are staged.
+  printf '%s\n' "$(cat "$verf")" > "$dst/BINARY_VERSION"
 
   chmod 0755 "$dst/bin"/* 2>/dev/null || :
   log_ok "staged $svc"
@@ -131,10 +124,9 @@ MANIFEST="$OPT/etc/manifest"
   echo "# duynhlab platform manifest — version $PLATFORM_VERSION"
   echo "# built_at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   while read -r svc; do
-    info="$BUILD_DIR/$svc/raw/build-info.env"
-    [[ -f "$info" ]] || die "Missing build-info.env for $svc (manifest)"
-    # Subshell: build-info.env sets VERSION/GIT_SHA — don't clobber our globals.
-    ( . "$info"; printf '%s sha=%s type=%s\n' "$svc" "${GIT_SHA:-unknown}" "${TYPE:-unknown}" )
+    verf="$BUILD_DIR/$svc/raw/VERSION"
+    [[ -f "$verf" ]] || die "Missing VERSION for $svc (manifest)"
+    printf '%s version=%s type=%s\n' "$svc" "$(cat "$verf")" "$(svc_field "$svc" type)"
   done < <(svc_list)
 } > "$MANIFEST"
 chmod 0644 "$MANIFEST"

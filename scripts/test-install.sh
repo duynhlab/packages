@@ -68,7 +68,6 @@ for svc in auth user product cart order review notification shipping; do
   test -x "$bin" || { echo "MISSING binary: $bin"; exit 1; }
   file "$bin" | grep -q "ELF.*executable" || { echo "NOT ELF: $bin"; exit 1; }
   test -s "/opt/duynhlab/$svc/BINARY_VERSION" || { echo "MISSING BINARY_VERSION: $svc"; exit 1; }
-  test -s "/opt/duynhlab/$svc/SCHEMA_VERSION" || { echo "MISSING SCHEMA_VERSION: $svc"; exit 1; }
   # Migrations are embedded in the binary — no loose SQL should be shipped (D24).
   test ! -e "/opt/duynhlab/$svc/migrations" \
     || { echo "UNEXPECTED migrations dir shipped: $svc"; exit 1; }

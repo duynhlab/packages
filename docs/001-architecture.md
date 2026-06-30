@@ -73,8 +73,7 @@ flowchart TB
 /opt/duynhlab/                      Immutable payload (owned by package)
 ├── <svc>/
 │   ├── bin/<svc>-service           Backend binary (migrations embedded via go:embed)
-│   ├── BINARY_VERSION
-│   └── SCHEMA_VERSION              Max embedded migration version (audit-only)
+│   └── BINARY_VERSION
 ├── frontend/dist/                  Static SPA
 ├── lib/                            CLI tools + init-service.sh + password-generator.sh
 ├── nginx/ valkey/ postgresql/      Config templates (copied into /etc on install)

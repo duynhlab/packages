@@ -77,15 +77,14 @@ backends only), `render-systemd.sh` (unit + platform target), `stage-all.sh`
 (`/opt/duynhlab/*/` + `PORT` in `<svc>.env`), `password-generator.sh` scans
 `secret-tpl/*.env.tpl`, and `duynhdb` takes a per-service arg. None need edits.
 
-> One exception for **backends consumed via `source=release`**: add a tag pin in
-> [`services.lock`](../services.lock) (omit it to track the newest release). See
-> [`004-build.md`](004-build.md) § 7.
+> Backends consumed via `source=release` need no pin — `fetch-releases.sh` pulls
+> the latest release automatically. See [`004-build.md`](004-build.md) § 7.
 
 ## 5. Build & verify locally
 
 ```bash
 make fetch-sources                      # clones payments-service alongside
-make build-local SERVICE=payments       # binary payload + build-info.env
+make build-local SERVICE=payments       # binary payload + VERSION
 make build-local-all                    # or rebuild everything
 make build                              # mega-RPM with payments inside
 make test-install                       # asserts the new loops you edited in §3
