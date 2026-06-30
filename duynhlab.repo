@@ -1,0 +1,6 @@
+[duynhlab]
+name=duynhlab platform packages (EL$releasever)
+baseurl=https://duynhlab.github.io/packages/rpm/el$releasever/$basearch/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
